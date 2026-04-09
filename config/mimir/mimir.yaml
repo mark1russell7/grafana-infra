@@ -1,0 +1,41 @@
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    kvstore:
+      store: inmemory
+    replication_factor: 1
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+  tsdb:
+    dir: /data/tsdb
+
+compactor:
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/rules
+
+limits:
+  native_histograms_ingestion_enabled: true

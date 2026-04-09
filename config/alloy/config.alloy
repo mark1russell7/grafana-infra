@@ -1,0 +1,64 @@
+// =============================================================================
+// OTLP Receiver — accepts traces, metrics, logs from browsers
+// =============================================================================
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+
+    cors {
+      allowed_origins = ["*"]
+      allowed_headers = ["*"]
+      max_age         = 7200
+    }
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// =============================================================================
+// Batch Processor — buffer before sending to backends
+// =============================================================================
+
+otelcol.processor.batch "default" {
+  timeout          = "5s"
+  send_batch_size  = 1000
+
+  output {
+    metrics = [otelcol.exporter.otlphttp.mimir.input]
+    logs    = [otelcol.exporter.otlphttp.loki.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// =============================================================================
+// Exporters — route to Grafana backends
+// =============================================================================
+
+otelcol.exporter.otlphttp "mimir" {
+  client {
+    endpoint = "http://mimir:9009/otlp"
+  }
+}
+
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}

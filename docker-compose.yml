@@ -1,0 +1,122 @@
+# Grafana Observability Stack
+#
+# Full LGTM+ stack for frontend observability.
+# Receives OTLP from browser apps via Alloy, stores in Mimir/Loki/Tempo.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down
+#   Open http://localhost:3000 for Grafana (admin/admin)
+#   Alloy UI: http://localhost:12345
+
+services:
+  # =========================================================================
+  # Mimir — Metrics (Prometheus-compatible)
+  # =========================================================================
+  mimir:
+    image: grafana/mimir:latest
+    container_name: ${MIMIR_CONTAINER_NAME:-mimir}
+    ports:
+      - "${MIMIR_PORT:-9009}:9009"
+    volumes:
+      - mimir_data:/data
+      - ./config/mimir/mimir.yaml:/etc/mimir/mimir.yaml
+    command:
+      - -config.file=/etc/mimir/mimir.yaml
+    restart: unless-stopped
+
+  # =========================================================================
+  # Loki — Logs
+  # =========================================================================
+  loki:
+    image: grafana/loki:3.6.0
+    container_name: ${LOKI_CONTAINER_NAME:-loki}
+    user: "0"
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - loki_data:/loki
+      - ./config/loki/loki.yaml:/etc/loki/loki.yaml
+    command:
+      - -config.file=/etc/loki/loki.yaml
+    restart: unless-stopped
+
+  # =========================================================================
+  # Tempo — Traces
+  # =========================================================================
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: ${TEMPO_CONTAINER_NAME:-tempo}
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - tempo_data:/var/tempo
+      - ./config/tempo/tempo.yaml:/etc/tempo/tempo.yaml
+    command:
+      - -config.file=/etc/tempo/tempo.yaml
+    restart: unless-stopped
+
+  # =========================================================================
+  # Pyroscope — Continuous Profiling
+  # =========================================================================
+  pyroscope:
+    image: grafana/pyroscope:latest
+    container_name: ${PYROSCOPE_CONTAINER_NAME:-pyroscope}
+    ports:
+      - "${PYROSCOPE_PORT:-4040}:4040"
+    volumes:
+      - pyroscope_data:/data
+    restart: unless-stopped
+
+  # =========================================================================
+  # Alloy — OpenTelemetry Collector (CORS-enabled for browsers)
+  # =========================================================================
+  alloy:
+    image: grafana/alloy:latest
+    container_name: ${ALLOY_CONTAINER_NAME:-alloy}
+    ports:
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+      - "${ALLOY_UI_PORT:-12345}:12345"
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    depends_on:
+      - mimir
+      - loki
+      - tempo
+    restart: unless-stopped
+
+  # =========================================================================
+  # Grafana — Visualization
+  # =========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ${GRAFANA_CONTAINER_NAME:-grafana}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-pyroscope-app
+    depends_on:
+      - mimir
+      - loki
+      - tempo
+      - pyroscope
+    restart: unless-stopped
+
+volumes:
+  grafana_data:
+  mimir_data:
+  loki_data:
+  tempo_data:
+  pyroscope_data:
