@@ -13,35 +13,9 @@
       "collapsed": false
     },
     {
-      "title": "Continuous Lag (avg, ms)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_continuous_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_continuous_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_continuous_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(lag_continuous_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
-      }
-    },
-    {
       "title": "Drift Lag (avg, ms)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "mimir" },
       "targets": [
         {
@@ -51,6 +25,10 @@
         {
           "expr": "histogram_quantile(0.95, rate(lag_drift_histogram_bucket{service_name=~\"$service\"}[1m]))",
           "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(lag_drift_histogram_bucket{service_name=~\"$service\"}[1m]))",
+          "legendFormat": "p99"
         }
       ],
       "fieldConfig": {
@@ -63,7 +41,7 @@
     {
       "title": "Macrotask Lag (avg, ms)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "mimir" },
       "targets": [
         {
@@ -89,10 +67,6 @@
       "datasource": { "type": "prometheus", "uid": "mimir" },
       "targets": [
         {
-          "expr": "rate(lag_continuous_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "continuous"
-        },
-        {
           "expr": "rate(lag_drift_histogram_count{service_name=~\"$service\"}[1m])",
           "legendFormat": "drift"
         },
@@ -114,10 +88,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "datasource": { "type": "prometheus", "uid": "mimir" },
       "targets": [
-        {
-          "expr": "lag_continuous_max_gauge{service_name=~\"$service\"}",
-          "legendFormat": "continuous max"
-        },
         {
           "expr": "lag_drift_max_gauge{service_name=~\"$service\"}",
           "legendFormat": "drift max"
@@ -587,10 +557,10 @@
       {
         "current": { "selected": false, "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "mimir" },
-        "definition": "label_values(lag_continuous_histogram_count, service_name)",
+        "definition": "label_values(lag_drift_histogram_count, service_name)",
         "includeAll": true,
         "name": "service",
-        "query": "label_values(lag_continuous_histogram_count, service_name)",
+        "query": "label_values(lag_drift_histogram_count, service_name)",
         "refresh": 2,
         "type": "query"
       }
