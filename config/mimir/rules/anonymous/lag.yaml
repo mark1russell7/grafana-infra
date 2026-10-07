@@ -1,0 +1,70 @@
+# Recording rules for the expensive queries of the Lag Monitor dashboard.
+#
+# Mimir's ruler loads this file through the local ruler storage: the
+# directory name is the tenant ("anonymous" without multitenancy), and the
+# file name is the rule namespace.
+#
+# Each rule first aggregates the native histograms of all page loads, then
+# takes the quantile. The rate5m rules store the aggregated rate as a native
+# histogram. A panel can take any quantile of it, or sum it across services.
+# Mimir allows 20 rules in one group (ruler_max_rules_per_rule_group).
+
+groups:
+  - name: lag-latency-5m
+    interval: 1m
+    rules:
+      - record: service_name:lag_drift_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_drift_histogram[5m]))
+      - record: service_name:lag_drift_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_drift_histogram[5m])))
+      - record: service_name:lag_drift_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_drift_histogram[5m])))
+
+      - record: service_name:lag_macrotask_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_macrotask_histogram[5m]))
+      - record: service_name:lag_macrotask_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_macrotask_histogram[5m])))
+      - record: service_name:lag_macrotask_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_macrotask_histogram[5m])))
+
+      - record: service_name:lag_worker_main_block_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_worker_main_block_histogram[5m]))
+      - record: service_name:lag_worker_main_block_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_worker_main_block_histogram[5m])))
+      - record: service_name:lag_worker_main_block_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_worker_main_block_histogram[5m])))
+
+      - record: service_name:lag_loaf_blocking_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_loaf_blocking_histogram[5m]))
+      - record: service_name:lag_loaf_blocking_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_loaf_blocking_histogram[5m])))
+      - record: service_name:lag_loaf_blocking_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_loaf_blocking_histogram[5m])))
+
+      - record: service_name:lag_event_duration_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_event_duration_histogram[5m]))
+      - record: service_name:lag_event_duration_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_event_duration_histogram[5m])))
+      - record: service_name:lag_event_duration_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_event_duration_histogram[5m])))
+
+      - record: service_name:lag_frame_delta_histogram:rate5m
+        expr: sum by (service_name) (rate(lag_frame_delta_histogram[5m]))
+      - record: service_name:lag_frame_delta_histogram:p95_rate5m
+        expr: histogram_quantile(0.95, sum by (service_name) (rate(lag_frame_delta_histogram[5m])))
+      - record: service_name:lag_frame_delta_histogram:p99_rate5m
+        expr: histogram_quantile(0.99, sum by (service_name) (rate(lag_frame_delta_histogram[5m])))
+
+  - name: lag-web-vitals-5m
+    interval: 1m
+    rules:
+      - record: service_name_navigation_type:lag_web_vital_inp_histogram:rate5m
+        expr: sum by (service_name, navigation_type) (rate(lag_web_vital_inp_histogram[5m]))
+      - record: service_name_navigation_type:lag_web_vital_cls_histogram:rate5m
+        expr: sum by (service_name, navigation_type) (rate(lag_web_vital_cls_histogram[5m]))
+      - record: service_name_navigation_type:lag_web_vital_lcp_histogram:rate5m
+        expr: sum by (service_name, navigation_type) (rate(lag_web_vital_lcp_histogram[5m]))
+      - record: service_name_navigation_type:lag_web_vital_fcp_histogram:rate5m
+        expr: sum by (service_name, navigation_type) (rate(lag_web_vital_fcp_histogram[5m]))
+      - record: service_name_navigation_type:lag_web_vital_ttfb_histogram:rate5m
+        expr: sum by (service_name, navigation_type) (rate(lag_web_vital_ttfb_histogram[5m]))

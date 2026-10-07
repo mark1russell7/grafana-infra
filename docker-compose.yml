@@ -1,7 +1,11 @@
 # Grafana Observability Stack
 #
 # Full LGTM+ stack for frontend observability.
-# Receives OTLP from browser apps via Alloy, stores in Mimir/Loki/Tempo.
+# Browsers send OTLP to Alloy. Alloy sends metrics to Mimir, logs to Loki and
+# traces to Tempo. See README.md.
+#
+# The Mimir, Alloy and Grafana images have fixed versions: the configuration
+# uses experimental Mimir options, and their names can change.
 #
 # Usage:
 #   docker compose up -d
@@ -14,13 +18,14 @@ services:
   # Mimir — Metrics (Prometheus-compatible)
   # =========================================================================
   mimir:
-    image: grafana/mimir:latest
+    image: grafana/mimir:3.2.2
     container_name: ${MIMIR_CONTAINER_NAME:-mimir}
     ports:
       - "${MIMIR_PORT:-9009}:9009"
     volumes:
       - mimir_data:/data
       - ./config/mimir/mimir.yaml:/etc/mimir/mimir.yaml
+      - ./config/mimir/rules:/etc/mimir/rules:ro
     command:
       - -config.file=/etc/mimir/mimir.yaml
     restart: unless-stopped
@@ -72,7 +77,7 @@ services:
   # Alloy — OpenTelemetry Collector (CORS-enabled for browsers)
   # =========================================================================
   alloy:
-    image: grafana/alloy:latest
+    image: grafana/alloy:v1.20.1
     container_name: ${ALLOY_CONTAINER_NAME:-alloy}
     ports:
       - "${OTLP_GRPC_PORT:-4317}:4317"
@@ -95,7 +100,7 @@ services:
   # Grafana — Visualization
   # =========================================================================
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0.10
     container_name: ${GRAFANA_CONTAINER_NAME:-grafana}
     ports:
       - "${GRAFANA_PORT:-3000}:3000"

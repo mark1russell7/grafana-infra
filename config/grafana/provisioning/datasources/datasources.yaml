@@ -9,6 +9,8 @@ datasources:
     isDefault: true
     jsonData:
       httpMethod: POST
+      # The browser export interval. $__rate_interval is then at least 4 x 15 s.
+      timeInterval: 15s
       exemplarTraceIdDestinations:
         - name: traceID
           datasourceUid: tempo

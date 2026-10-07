@@ -1,3 +1,9 @@
+# Grafana Mimir in monolithic mode, for OTLP metrics from browsers.
+#
+# The option names are checked against Mimir 3.2.2 (`mimir -help-all` and
+# the /config endpoint). Options marked (experimental) can change in a later
+# Mimir version, so docker-compose.yml pins the image version.
+
 multitenancy_enabled: false
 
 server:
@@ -32,10 +38,61 @@ compactor:
     kvstore:
       store: inmemory
 
+# The Lag Monitor dashboard sends about 130 queries when it loads. Query
+# sharding splits each query into up to 16 requests. With the default limit
+# (100), Mimir answers 429 "too many outstanding requests" to some panels.
+query_scheduler:
+  max_outstanding_requests_per_tenant: 4096
+
+# The ruler evaluates the recording rules in config/mimir/rules. The local
+# backend reads the files of each tenant from <directory>/<tenant>/. Without
+# multitenancy, the tenant is "anonymous". The ruler API is read-only.
+ruler:
+  rule_path: /data/ruler
+
 ruler_storage:
-  backend: filesystem
-  filesystem:
-    dir: /data/rules
+  backend: local
+  local:
+    directory: /etc/mimir/rules
 
 limits:
+  # Exponential histograms become native histograms: one series each, with
+  # no _bucket, _sum or _count series. Mimir 3.2 enables this by default.
   native_histograms_ingestion_enabled: true
+
+  # (experimental) Adds a zero sample at the OTLP start time of each new
+  # series, so rate() and increase() also count the first export of a page
+  # load. Mimir uses the start time only when it is at most 5 minutes before
+  # the sample (defaultIntervalForStartTimestamps in the OTLP appender).
+  otel_created_timestamp_zero_ingestion_enabled: true
+
+  # (experimental) Copies these resource attributes onto every series. Each
+  # one is constant for an SDK instance, so it adds no series. service.name
+  # gives the service_name label that the dashboards and Loki also use.
+  # Never add session.id or other per-session values here.
+  # service.instance.id needs no promotion: it becomes the instance label.
+  promote_otel_resource_attributes: "service.name,service.namespace,service.version,deployment.environment.name,browser.platform,browser.mobile"
+
+  # Accepts samples up to 10 minutes older than the newest sample of a
+  # series: retries, slow final exports and the created-timestamp zero
+  # samples. It does not merge writers that share a series.
+  out_of_order_time_window: 10m
+
+  # Series budget, with the rule from the R1 research:
+  #   in-memory series = R x 2.5 h x S
+  # S = series for each writer (SDK instance). The lag catalog has 42 metrics.
+  #   With native histograms, a page load has about 85 series and target_info,
+  #   so S = 100.
+  # R = writers for each hour. This local stack plans for integration and load
+  #   tests: R = 2,000 page loads in one hour.
+  # 2,000 x 2.5 x 100 = 500,000. The series of a page that closed stay in
+  # memory until the next head compaction (2 h), thus the factor 2.5 h.
+  max_global_series_per_user: 500000
+  # The largest metric, lag_lifecycle_transitions, has at most 17 attribute
+  # sets for each writer: 2,000 x 2.5 x 20 = 100,000.
+  max_global_series_per_metric: 100000
+  # The default ingestion rate (10,000 samples/s) is sufficient:
+  # 330 open pages x 100 series / 15 s export interval = 2,200 samples/s.
+
+  # Do not enable otel_native_delta_ingestion. Browsers export cumulative
+  # temporality, and delta ingestion is experimental.
