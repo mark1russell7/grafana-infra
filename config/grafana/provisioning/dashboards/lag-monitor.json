@@ -237,22 +237,19 @@
       "collapsed": false
     },
     {
-      "title": "Worker Round-Trip Time",
+      "title": "Worker Self-Lag",
+      "description": "How late the worker's own heartbeat timer fires. Near zero means the main-thread block readings are trustworthy; high values mean the worker itself was starved.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
       "datasource": { "type": "prometheus", "uid": "mimir" },
       "targets": [
         {
-          "expr": "rate(lag_worker_roundtrip_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_worker_roundtrip_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg round-trip"
+          "expr": "rate(lag_worker_self_lag_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_worker_self_lag_histogram_count{service_name=~\"$service\"}[1m])",
+          "legendFormat": "avg self-lag"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(lag_worker_roundtrip_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 round-trip"
-        },
-        {
-          "expr": "lag_worker_roundtrip_max_gauge{service_name=~\"$service\"}",
-          "legendFormat": "max round-trip"
+          "expr": "histogram_quantile(0.95, rate(lag_worker_self_lag_histogram_bucket{service_name=~\"$service\"}[1m]))",
+          "legendFormat": "p95 self-lag"
         }
       ],
       "fieldConfig": {
@@ -263,7 +260,8 @@
       }
     },
     {
-      "title": "Estimated Main Thread Block",
+      "title": "Main Thread Block (worker heartbeats)",
+      "description": "How long each worker heartbeat waited for the main thread: main-thread blocking measured from outside the main thread.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
       "datasource": { "type": "prometheus", "uid": "mimir" },
@@ -275,6 +273,10 @@
         {
           "expr": "histogram_quantile(0.95, rate(lag_worker_main_block_histogram_bucket{service_name=~\"$service\"}[1m]))",
           "legendFormat": "p95 main block"
+        },
+        {
+          "expr": "lag_worker_main_block_max_gauge{service_name=~\"$service\"}",
+          "legendFormat": "max main block"
         }
       ],
       "fieldConfig": {
