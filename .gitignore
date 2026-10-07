@@ -1,2 +1,4 @@
 data/
 .env.local
+node_modules/
+sample-summary.json

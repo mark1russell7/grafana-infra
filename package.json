@@ -1,0 +1,22 @@
+{
+  "name": "@mark1russell7/grafana-infra",
+  "version": "0.0.0",
+  "description": "Docker Compose Grafana stack (Alloy, Mimir, Loki, Tempo, Grafana) with the lag dashboards",
+  "scripts": {
+    "sample-data": "node scripts/send-sample-data.mjs",
+    "dashboards": "node scripts/build-dashboards.mjs",
+    "verify": "node scripts/verify-pipeline.mjs"
+  },
+  "packageManager": "pnpm@10.26.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/api-logs": "^0.223.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.223.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.223.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-logs": "^0.223.0",
+    "@opentelemetry/sdk-metrics": "^2.12.0"
+  }
+}
