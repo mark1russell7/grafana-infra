@@ -1,16 +1,42 @@
 // =============================================================================
-// OTLP Receiver — accepts traces, metrics, logs from browsers
+// Grafana Alloy: OTLP from browsers to Mimir, Loki and Tempo
+//
+//   otelcol.receiver.otlp ──► metrics ──────────────────────► batch ──► Mimir
+//                         ├─► logs ────► transform.event_name ► batch ──► Loki
+//                         └─► traces ─────────────────────────► batch ──► Tempo
+//
+// All components are generally available. Alloy keeps no state, so a restart
+// loses nothing: browsers export cumulative metrics.
 // =============================================================================
 
+// -----------------------------------------------------------------------------
+// OTLP receiver. Browsers post OTLP/HTTP (JSON or protobuf) to port 4318.
+// -----------------------------------------------------------------------------
 otelcol.receiver.otlp "default" {
   grpc {
     endpoint = "0.0.0.0:4317"
   }
+
   http {
     endpoint = "0.0.0.0:4318"
 
+    // Pages on any localhost port can post. A JSON body (Content-Type
+    // application/json) needs a CORS preflight. The lag worker sends hang
+    // reports with fetch(url, { keepalive: true }), which also gets a
+    // preflight. The receiver answers it, and it echoes the page origin with
+    // Access-Control-Allow-Credentials: true, so sendBeacon also works.
+    // Add the origins of other dev hosts to this list.
     cors {
-      allowed_origins = ["*"]
+      allowed_origins = [
+        "http://localhost",
+        "http://localhost:*",
+        "https://localhost",
+        "https://localhost:*",
+        "http://127.0.0.1",
+        "http://127.0.0.1:*",
+        "https://127.0.0.1",
+        "https://127.0.0.1:*",
+      ]
       allowed_headers = ["*"]
       max_age         = 7200
     }
@@ -18,18 +44,46 @@ otelcol.receiver.otlp "default" {
 
   output {
     metrics = [otelcol.processor.batch.default.input]
-    logs    = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.transform.event_name.input]
     traces  = [otelcol.processor.batch.default.input]
   }
 }
 
-// =============================================================================
-// Batch Processor — buffer before sending to backends
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Events for Loki.
+//
+// 1. Loki drops an entry when the previous entry of its stream has the same
+//    timestamp and the same line. Event records often have no body, and a
+//    browser sends several events in the same millisecond (the five Web
+//    Vitals of one report). So a record without a body gets its attributes,
+//    as sorted key=value pairs, as the line.
+// 2. Loki 3.6 and 3.7 ignore the EventName field of an OTLP log record. This
+//    copies it to the log attribute event.name, which Loki stores as the
+//    index label event_name (see config/loki/loki.yaml). A record that
+//    already has an event.name attribute keeps it.
+// -----------------------------------------------------------------------------
+otelcol.processor.transform "event_name" {
+  error_mode = "ignore"
 
+  log_statements {
+    context    = "log"
+    statements = [
+      `set(log.body, ToKeyValueString(log.attributes, "=", " ", true)) where log.body == nil or log.body == ""`,
+      `set(log.attributes["event.name"], log.event_name) where log.event_name != ""`,
+    ]
+  }
+
+  output {
+    logs = [otelcol.processor.batch.default.input]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Batch processor. A short timeout gives fast feedback in development.
+// -----------------------------------------------------------------------------
 otelcol.processor.batch "default" {
-  timeout          = "5s"
-  send_batch_size  = 1000
+  timeout         = "1s"
+  send_batch_size = 1000
 
   output {
     metrics = [otelcol.exporter.otlphttp.mimir.input]
@@ -38,16 +92,19 @@ otelcol.processor.batch "default" {
   }
 }
 
-// =============================================================================
-// Exporters — route to Grafana backends
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Exporters
+// -----------------------------------------------------------------------------
 
+// Mimir translates OTLP to Prometheus series: service.name becomes job,
+// service.instance.id becomes instance. See config/mimir/mimir.yaml.
 otelcol.exporter.otlphttp "mimir" {
   client {
     endpoint = "http://mimir:9009/otlp"
   }
 }
 
+// Loki's native OTLP endpoint. See config/loki/loki.yaml for the labels.
 otelcol.exporter.otlphttp "loki" {
   client {
     endpoint = "http://loki:3100/otlp"
@@ -57,6 +114,7 @@ otelcol.exporter.otlphttp "loki" {
 otelcol.exporter.otlp "tempo" {
   client {
     endpoint = "tempo:4317"
+
     tls {
       insecure = true
     }
