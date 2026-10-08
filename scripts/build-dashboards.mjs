@@ -284,10 +284,10 @@ timeseries("Worker clock offset",
 
 row("Hangs (WorkerLagMonitor)");
 timeseries("Hangs per minute, by outcome",
-    "Main-thread hangs that the workers detected: the main thread did not acknowledge heartbeats. Abandoned: the page closed or crashed during the hang, and the next page of the origin reported it.",
+    "Main-thread hangs that the workers detected: the main thread did not acknowledge heartbeats. Abandoned: the page closed or crashed during the hang. The next page of the origin, another open page of the origin, or the page itself at its close reported it (lag.hang.source).",
     [prom(perMinute("lag_main_thread_hangs", { by : "outcome" }), "{{outcome}}")], { unit : "none", bars : true });
 timeseries("Hang duration p50 / p95, by outcome",
-    "The duration of each hang. For an abandoned hang, the duration until the worker saw the hang for the last time.",
+    "The duration of each hang. For an abandoned hang, the duration until the worker saw the hang for the last time, or until the end of the page.",
     quantileTargets("lag_main_thread_hang_duration_histogram", { by : "outcome" }, [0.5, 0.95]));
 
 row("Measurement conditions (stalls and discarded samples)");
@@ -489,7 +489,7 @@ timeseries("Events per minute, by event name",
     "Lag events in Loki in the minute before each point. event_name is an index label.",
     [loki('sum by (event_name) (count_over_time({service_name=~"$service_name", event_name=~".+"} [1m]))', "{{event_name}}")], { unit : "none", w : 24, h : 7, interval : "15s" });
 eventTable("Recent hangs and stalls",
-    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin.",
+    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (lag.hang.source journal), another open page (peer), or the page itself at its close (self).",
     '{service_name=~"$service_name", event_name=~"lag.main_thread.hang|lag.stall"}',
     ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "session_id", "service_instance_id"],
     {
