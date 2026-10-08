@@ -247,7 +247,7 @@ timeseries("Drift lag p50 / p95 / p99",
     "The lag of each window of chained timeouts (about 100 ms): its duration minus the idle duration of its steps. Each main-thread block in the window adds to it.",
     [...quantileTargets("lag_drift_histogram"), prom(`histogram_avg(${sumRate("lag_drift_histogram")})`, "mean")]);
 timeseries("Drift baseline: timer granularity",
-    "The idle duration of one timer step: the mean of the recent steps that are not blocks. It is the timer granularity of the browser and the operating system. DriftLag subtracts it.",
+    "The idle duration of one timer step: the mean of the recent steps that are not blocks. An increase needs a probe that shows an idle thread, thus a sustained load does not change it. It is the timer granularity of the browser and the operating system. DriftLag subtracts it.",
     quantileTargets("lag_drift_baseline_histogram", {}, [0.5, 0.95]), { w : 6 });
 timeseries("Drift windows per second",
     "Windows that DriftLag recorded each second, for all page loads. Windows of hidden or frozen pages are discarded.",
