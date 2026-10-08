@@ -100,13 +100,13 @@ export const EVENTS = [
         ],
     },
     { name : "lag.main_thread.hang", attributes : ["phase", "duration_ms", "lag.hang.page_id", "lag.page_view.id"] },
-    { name : "lag.clock.jump", attributes : ["direction", "kind", "magnitude_ms", "skew_ms", "lateness_ms"] },
+    { name : "lag.clock.jump", attributes : ["direction", "kind", "magnitude_ms", "skew_ms", "lateness_ms", "lag.page_view.id"] },
     {
         name : "lag.long_animation_frame",
-        attributes : ["duration_ms", "blocking_duration_ms", "script.invoker", "script.invoker_type", "script.source_url", "script.duration_ms"],
+        attributes : ["duration_ms", "blocking_duration_ms", "script.invoker", "script.invoker_type", "script.source_url", "script.duration_ms", "lag.page_view.id"],
     },
-    { name : "lag.browser_report", attributes : ["type", "id", "message", "source_file", "line_number"] },
-    { name : "lag.stall", attributes : ["kind", "duration_ms"] },
+    { name : "lag.browser_report", attributes : ["type", "id", "message", "source_file", "line_number", "lag.page_view.id"] },
+    { name : "lag.stall", attributes : ["kind", "duration_ms", "lag.page_view.id"] },
 ];
 
 /** Good and poor thresholds of the vitals. A value at or below `good` is good; a value above `poor` is poor. */

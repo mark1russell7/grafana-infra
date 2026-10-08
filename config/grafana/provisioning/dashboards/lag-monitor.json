@@ -615,7 +615,7 @@
     {
       "type": "timeseries",
       "title": "Drift baseline: timer granularity",
-      "description": "The idle duration of one timer step, the median of the recent steps. It is the timer granularity of the browser and the operating system. DriftLag subtracts it.",
+      "description": "The idle duration of one timer step: the mean of the recent steps that are not blocks. It is the timer granularity of the browser and the operating system. DriftLag subtracts it.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"

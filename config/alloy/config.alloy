@@ -59,8 +59,8 @@ otelcol.receiver.otlp "default" {
 //    as sorted key=value pairs, as the line.
 // 2. Loki 3.6 and 3.7 ignore the EventName field of an OTLP log record. This
 //    copies it to the log attribute event.name, which Loki stores as the
-//    index label event_name (see config/loki/loki.yaml). A record that
-//    already has an event.name attribute keeps it.
+//    index label event_name (see config/loki/loki.yaml). The EventName
+//    replaces an event.name attribute that the record already has.
 // -----------------------------------------------------------------------------
 otelcol.processor.transform "event_name" {
   error_mode = "ignore"

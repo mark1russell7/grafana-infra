@@ -24,7 +24,7 @@ The Mimir, Alloy and Grafana images have fixed versions. The Mimir configuration
    ```
 
 2. Open Grafana at <http://localhost:3000>.
-3. To edit a dashboard, sign in as `admin` with the password `admin`. Grafana 13 gives anonymous users the Viewer role.
+3. Edit the dashboards as an anonymous user, or sign in as `admin` with the password `admin`. `config/grafana/grafana.ini` gives anonymous users the Admin role. Use this setting only on your own computer.
 4. Stop the stack:
 
    ```sh
