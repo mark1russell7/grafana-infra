@@ -1,575 +1,5809 @@
 {
-  "annotations": { "list": [] },
+  "uid": "lag-monitor",
+  "title": "Lag Monitor",
+  "description": "Main-thread lag of browser pages, from the lag library: native-histogram metrics in Mimir and events in Loki.",
+  "tags": [
+    "lag",
+    "performance",
+    "otel",
+    "browser"
+  ],
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "timepicker": {},
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
   "links": [],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service_name",
+        "label": "Service",
+        "description": "The service.name resource attribute. Mimir promotes it to the service_name label. Loki indexes it.",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "definition": "label_values(lag_drift_histogram, service_name)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(lag_drift_histogram, service_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "regex": "",
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "navigation_type",
+        "label": "Navigation type",
+        "description": "How the page view started. Used by the Web Vitals panels.",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "definition": "label_values(lag_web_vital_lcp_histogram{service_name=~\"$service_name\"}, navigation_type)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(lag_web_vital_lcp_histogram{service_name=~\"$service_name\"}, navigation_type)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "regex": "",
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
   "panels": [
     {
-      "title": "Timer-Based Monitors",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "collapsed": false
-    },
-    {
-      "title": "Drift Lag (avg, ms)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_drift_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_drift_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_drift_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(lag_drift_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
+      "title": "Overview",
+      "collapsed": false,
+      "panels": [],
+      "id": 1,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
       }
     },
     {
-      "title": "Macrotask Lag (avg, ms)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_macrotask_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_macrotask_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_macrotask_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
-      }
-    },
-    {
-      "title": "Measurement Rate",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_drift_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "drift"
-        },
-        {
-          "expr": "rate(lag_macrotask_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "macrotask"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
-        }
-      }
-    },
-    {
-      "title": "Max Lag Gauges",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "lag_drift_max_gauge{service_name=~\"$service\"}",
-          "legendFormat": "drift max"
-        },
-        {
-          "expr": "lag_macrotask_max_gauge{service_name=~\"$service\"}",
-          "legendFormat": "macrotask max"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ms" }
-      }
-    },
-    {
-      "title": "Performance Observers",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
-      "collapsed": false
-    },
-    {
-      "title": "Long Animation Frame - Blocking Duration",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_loaf_blocking_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_loaf_blocking_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg blocking"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_loaf_blocking_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 blocking"
-        }
-      ],
+      "title": "Active page loads",
+      "description": "Page loads (SDK instances) that sent drift samples in the minute before each point. Each page load has its own service.instance.id.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
-      }
-    },
-    {
-      "title": "INP (Interaction to Next Paint)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "lag_inp_worst_gauge{service_name=~\"$service\"}",
-          "legendFormat": "INP (worst)"
-        },
-        {
-          "expr": "rate(lag_inp_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_inp_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg interaction"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 },
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 200 },
-              { "color": "red", "value": 500 }
+              {
+                "color": "text",
+                "value": null
+              }
             ]
           }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "count(count_over_time(lag_drift_histogram{service_name=~\"$service_name\"}[1m])) or vector(0)",
+          "legendFormat": "page loads",
+          "range": true,
+          "instant": false
         }
+      ],
+      "id": 2,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
       }
     },
     {
-      "title": "CLS (Cumulative Layout Shift)",
-      "type": "gauge",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "type": "stat",
+      "title": "Drift p95",
+      "description": "The 95th percentile of the drift lag of all page loads.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
       "targets": [
         {
-          "expr": "lag_cls_worst_session_gauge{service_name=~\"$service\"}",
-          "legendFormat": "CLS"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
         }
       ],
+      "id": 3,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Heartbeat delay p95",
+      "description": "The 95th percentile of the worker heartbeat delivery delay: the lag that a random event sees.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 4,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "INP p75",
+      "description": "Interaction to Next Paint, 75th percentile of the page views in the time range. Good: 200 ms or less. Poor: more than 500 ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "INP p75",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 5,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Hangs",
+      "description": "Main-thread hangs that the workers detected in the time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum(increase(lag_main_thread_hangs{service_name=~\"$service_name\"}[$__range]))",
+          "legendFormat": "hangs",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 6,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Stalls",
+      "description": "Very long samples (hangs and suspends) in the time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum(increase(lag_stalls{service_name=~\"$service_name\"}[$__range]))",
+          "legendFormat": "stalls",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 7,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      }
+    },
+    {
+      "type": "row",
+      "title": "Drift (DriftLag)",
+      "collapsed": false,
+      "panels": [],
+      "id": 8,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Drift lag p50 / p95 / p99",
+      "description": "The lag of each window of chained timeouts (about 100 ms): its duration minus the idle duration of its steps. Each main-thread block in the window adds to it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_avg(sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "mean",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Drift baseline: timer granularity",
+      "description": "The idle duration of one timer step: the mean of the recent steps that are not blocks. It is the timer granularity of the browser and the operating system. DriftLag subtracts it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 6
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Drift windows per second",
+      "description": "Windows that DriftLag recorded each second, for all page loads. Windows of hidden or frozen pages are discarded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.1 },
-              { "color": "red", "value": 0.25 }
-            ]
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
           }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
-      }
-    },
-    {
-      "title": "INP Decomposition",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      },
       "targets": [
         {
-          "expr": "rate(lag_inp_input_delay_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_inp_input_delay_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "input delay"
-        },
-        {
-          "expr": "rate(lag_inp_processing_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_inp_processing_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "processing"
-        },
-        {
-          "expr": "rate(lag_inp_presentation_delay_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_inp_presentation_delay_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "presentation"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_count(sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "windows/s",
+          "range": true,
+          "instant": false
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 80 }
-        }
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 6
       }
     },
     {
-      "title": "LoAF Rate",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_loaf_duration_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "long animation frames / sec"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
-        }
-      }
-    },
-    {
-      "title": "Worker Monitor",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
-      "collapsed": false
-    },
-    {
-      "title": "Worker Round-Trip Time",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_worker_roundtrip_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_worker_roundtrip_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg round-trip"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_worker_roundtrip_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 round-trip"
-        },
-        {
-          "expr": "lag_worker_roundtrip_max_gauge{service_name=~\"$service\"}",
-          "legendFormat": "max round-trip"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
+      "title": "Macrotask (MacrotaskLag)",
+      "collapsed": false,
+      "panels": [],
+      "id": 12,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
       }
     },
     {
-      "title": "Estimated Main Thread Block",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_worker_main_block_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_worker_main_block_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg main block"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_worker_main_block_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 main block"
-        }
-      ],
+      "title": "Macrotask queue delay p50 / p95 / p99",
+      "description": "The time that a zero-delay timeout waits in the task queue. Each page load measures one sample every 5 seconds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_avg(sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "mean",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 15
       }
     },
     {
-      "title": "Scheduling Fairness",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
-      "collapsed": false
-    },
-    {
-      "title": "Scheduling Latency by Primitive (avg, ms)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_scheduling_microtask_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_scheduling_microtask_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "microtask"
-        },
-        {
-          "expr": "rate(lag_scheduling_message_channel_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_scheduling_message_channel_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "MessageChannel"
-        },
-        {
-          "expr": "rate(lag_scheduling_macrotask_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_scheduling_macrotask_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "macrotask (setTimeout)"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
-        }
+      "title": "Scheduling fairness (SchedulingFairnessMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 14,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
       }
     },
     {
-      "title": "Scheduling p95 by Primitive",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_scheduling_microtask_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 microtask"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_scheduling_message_channel_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 MessageChannel"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_scheduling_macrotask_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 macrotask"
-        }
-      ],
+      "title": "Scheduling latency p50, by primitive",
+      "description": "The median latency of each scheduling primitive. The microtask latency stays near 0 and is the baseline.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "microtask",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "macrotask (setTimeout 0)",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "MessageChannel",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 15,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
       }
     },
     {
-      "title": "Frame Timing (rAF)",
+      "type": "timeseries",
+      "title": "Scheduling latency p99, by primitive",
+      "description": "The 99th percentile latency of each scheduling primitive. A high macrotask or MessageChannel value shows a busy task queue.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "microtask",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "macrotask (setTimeout 0)",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "MessageChannel",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 16,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    },
+    {
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
-      "collapsed": false
+      "title": "Worker heartbeat (WorkerLagMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 17,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      }
     },
     {
-      "title": "FPS",
+      "type": "timeseries",
+      "title": "Heartbeat delivery delay: the lag that a random event sees",
+      "description": "The primary lag estimator. A worker sends a heartbeat each second from its own thread. The delay is the time that the heartbeat waited for the main thread. Heartbeats arrive at random times, as user events do.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_avg(sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "mean",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 18,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker self-lag",
+      "description": "The lateness of the worker's own heartbeat timer. A high value shows that the worker itself did not run, so its heartbeat delays are not reliable then.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 19,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 33
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker clock offset",
+      "description": "The absolute offset between the worker clock and the main-thread clock, from the clock synchronization exchange.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 20,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 33
+      }
+    },
+    {
+      "type": "row",
+      "title": "Hangs (WorkerLagMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 21,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Hangs per minute, by outcome",
+      "description": "Main-thread hangs that the workers detected: the main thread did not acknowledge heartbeats. Abandoned: the page closed or crashed during the hang, and the next page of the origin reported it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (outcome) (rate(lag_main_thread_hangs{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 22,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Hang duration p50 / p95, by outcome",
+      "description": "The duration of each hang. For an abandoned hang, the duration until the worker saw the hang for the last time.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{outcome}}",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{outcome}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 23,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      }
+    },
+    {
+      "type": "row",
+      "title": "Measurement conditions (stalls and discarded samples)",
+      "collapsed": false,
+      "panels": [],
+      "id": 24,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stalls per minute, by kind",
+      "description": "Very long samples. A hang has no evidence of a suspend. A suspend overlaps evidence that the system stopped (for example, the device slept).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (kind) (rate(lag_stalls{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 25,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 51
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stall duration p50 / p95, by kind",
+      "description": "The duration of each very long sample.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{kind}}",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{kind}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 26,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 51
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Samples discarded per minute, by reason",
+      "description": "Samples that a monitor did not record, because the page was hidden or frozen, or the system was suspended during the measurement window.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (reason) (rate(lag_samples_discarded{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{reason}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 27,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 51
+      }
+    },
+    {
+      "type": "row",
+      "title": "Clock (ClockDriftMonitor and ClockReliabilityChecker)",
+      "collapsed": false,
+      "panels": [],
+      "id": 28,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Clock jumps per minute, by kind and direction",
+      "description": "Discontinuities between the wall clock and the monotonic clock. Suspend: the monotonic clock stopped while the device slept. Step: the system clock changed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (kind, direction) (rate(lag_clock_jumps{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{kind}} {{direction}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 29,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 60
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Clock skew p50 / p95 / p99",
+      "description": "The absolute difference between Date.now() and the absolute monotonic clock (timeOrigin plus performance.now()).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 30,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 60
+      }
+    },
+    {
       "type": "stat",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 53 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "lag_frame_fps_gauge{service_name=~\"$service\"}",
-          "legendFormat": "fps"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "fps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 30 },
-              { "color": "green", "value": 55 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "title": "Frame Delta (avg, ms)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 53 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        {
-          "expr": "rate(lag_frame_delta_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_frame_delta_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg frame delta"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(lag_frame_delta_histogram_bucket{service_name=~\"$service\"}[1m]))",
-          "legendFormat": "p95 frame delta"
-        }
-      ],
+      "title": "performance.now() resolution",
+      "description": "The resolution of performance.now() of the page loads in the time range. Each page load measures it one time. Cross-origin isolated pages get 5 µs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\"}[$__range])))",
+          "legendFormat": "p50",
+          "range": false,
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\"}[$__range])))",
+          "legendFormat": "p95",
+          "range": false,
+          "instant": true
         }
+      ],
+      "id": 31,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 60
       }
     },
     {
-      "title": "Dropped Frame Rate",
-      "type": "gauge",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 53 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "type": "row",
+      "title": "Long animation frames (LongAnimationFrameMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 32,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "LoAF blocking duration p50 / p95 / p99",
+      "description": "The blocking duration of each long animation frame: the time over 50 ms of its long tasks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
-          "expr": "lag_frame_dropped_rate_gauge{service_name=~\"$service\"}",
-          "legendFormat": "dropped"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
         }
       ],
+      "id": 33,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 69
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "LoAF duration p50 / p95 / p99",
+      "description": "The total duration of each long animation frame.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 34,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 69
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Long animation frames per minute",
+      "description": "Long animation frames of all page loads, each minute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * histogram_count(sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "frames/min",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 35,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 69
+      }
+    },
+    {
+      "type": "table",
+      "title": "LoAF attribution: blocking time by script (events)",
+      "description": "From the lag.long_animation_frame events (frames that block 150 ms or more). The script is the script that blocked the frame most.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Blocking time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (sum_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | keep script_invoker_type, script_invoker, script_source_url, blocking_duration_ms | unwrap blocking_duration_ms [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (count_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | keep script_invoker_type, script_invoker, script_source_url [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Blocking time",
+              "Value #B": "Frames",
+              "script_invoker_type": "Invoker type",
+              "script_invoker": "Invoker",
+              "script_source_url": "Script URL"
+            }
+          }
+        }
+      ],
+      "id": 36,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      }
+    },
+    {
+      "type": "row",
+      "title": "Event timing (EventTimingMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 37,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event duration p95, by interaction type",
+      "description": "The duration of each interaction event of 16 ms or more, from the input to the next paint.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "{{interaction}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event phases p95",
+      "description": "Where the time of an interaction goes: the input delay before the handlers, the processing time of the handlers, and the presentation delay to the next paint.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_input_delay_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "input delay",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_processing_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "processing",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_presentation_delay_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "presentation delay",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Interactions per minute, by interaction type",
+      "description": "Interaction events of 16 ms or more, each minute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * histogram_count(sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "{{interaction}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 86
+      }
+    },
+    {
+      "type": "row",
+      "title": "Layout shift (LayoutShiftMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 41,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Layout shift score p50 / p95 / p99",
+      "description": "The score of each layout shift that did not follow user input.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 3,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 42,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 95
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Layout shifts per minute",
+      "description": "Layout shifts without user input, each minute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * histogram_count(sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "shifts/min",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 43,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 95
+      }
+    },
+    {
+      "type": "row",
+      "title": "Web Vitals (PageViewVitals)",
+      "collapsed": false,
+      "panels": [],
+      "id": 44,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 103
+      }
+    },
+    {
+      "type": "stat",
+      "title": "INP p75 (time range)",
+      "description": "Interaction to Next Paint, 75th percentile of the page views in the time range, by navigation type. Good: 200 ms or less. Poor: more than 500 ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 45,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 104
+      }
+    },
+    {
+      "type": "stat",
+      "title": "CLS p75 (time range)",
+      "description": "Cumulative Layout Shift, 75th percentile of the page views in the time range, by navigation type. Good: 0.1 or less. Poor: more than 0.25.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_cls_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 46,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 104
+      }
+    },
+    {
+      "type": "stat",
+      "title": "LCP p75 (time range)",
+      "description": "Largest Contentful Paint, 75th percentile of the page views in the time range, by navigation type. Good: 2500 ms or less. Poor: more than 4000 ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2500
+              },
+              {
+                "color": "red",
+                "value": 4000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 47,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 8,
+        "y": 104
+      }
+    },
+    {
+      "type": "stat",
+      "title": "FCP p75 (time range)",
+      "description": "First Contentful Paint, 75th percentile of the page views in the time range, by navigation type. Good: 1800 ms or less. Poor: more than 3000 ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1800
+              },
+              {
+                "color": "red",
+                "value": 3000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 48,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 12,
+        "y": 104
+      }
+    },
+    {
+      "type": "stat",
+      "title": "TTFB p75 (time range)",
+      "description": "Time to First Byte, 75th percentile of the page views in the time range, by navigation type. Good: 800 ms or less. Poor: more than 1800 ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 800
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 49,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 104
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Page views (time range)",
+      "description": "Page views that reported LCP in the time range: the sample size of the vitals. The count is approximate, because increase() extrapolates.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "showPercentChange": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_count(sum(increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "legendFormat": "page views",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "id": 50,
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 104
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "INP p75, by navigation type",
+      "description": "Interaction to Next Paint p75 of the page views that reported in each interval. The histogram gets one value for each page view, usually when the page is hidden for the first time. Good: 200 ms or less. Poor: more than 500 ms. The dashed lines show the thresholds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 51,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 110
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CLS p75, by navigation type",
+      "description": "Cumulative Layout Shift p75 of the page views that reported in each interval. The histogram gets one value for each page view, usually when the page is hidden for the first time. Good: 0.1 or less. Poor: more than 0.25. The dashed lines show the thresholds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 3,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_cls_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 52,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 110
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "LCP p75, by navigation type",
+      "description": "Largest Contentful Paint p75 of the page views that reported in each interval. The histogram gets one value for each page view, usually when the page is hidden for the first time. Good: 2500 ms or less. Poor: more than 4000 ms. The dashed lines show the thresholds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2500
+              },
+              {
+                "color": "red",
+                "value": 4000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 53,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 118
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "FCP p75, by navigation type",
+      "description": "First Contentful Paint p75 of the page views that reported in each interval. The histogram gets one value for each page view, usually when the page is hidden for the first time. Good: 1800 ms or less. Poor: more than 3000 ms. The dashed lines show the thresholds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1800
+              },
+              {
+                "color": "red",
+                "value": 3000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 54,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 118
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "TTFB p75, by navigation type",
+      "description": "Time to First Byte p75 of the page views that reported in each interval. The histogram gets one value for each page view, usually when the page is hidden for the first time. Good: 800 ms or less. Poor: more than 1800 ms. The dashed lines show the thresholds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 800
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "legendFormat": "{{navigation_type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 55,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 118
+      }
+    },
+    {
+      "type": "table",
+      "title": "Web Vitals p75 from events, by navigation type",
+      "description": "From the browser.web_vital events (LogQL unwrap of browser_web_vital_value). A page view sends a new event at each change of a vital, so this p75 includes the earlier values too.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Events",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type, browser_web_vital_value | unwrap browser_web_vital_value [$__range]) by (browser_web_vital_name, browser_web_vital_navigation_type)",
+          "legendFormat": "",
+          "queryType": "instant"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (browser_web_vital_name, browser_web_vital_navigation_type) (count_over_time({service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "p75",
+              "Value #B": "Events",
+              "browser_web_vital_name": "Vital",
+              "browser_web_vital_navigation_type": "Navigation type"
+            }
+          }
+        }
+      ],
+      "id": 56,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 126
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Web Vitals p75 from events",
+      "description": "The p75 of browser_web_vital_value for each vital, from the events in a 5-minute window. CLS uses the right axis.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cls"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_value | unwrap browser_web_vital_value [5m]) by (browser_web_vital_name)",
+          "legendFormat": "{{browser_web_vital_name}}",
+          "queryType": "range"
+        }
+      ],
+      "id": 57,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 126
+      }
+    },
+    {
+      "type": "row",
+      "title": "Frames (FrameTimingMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 58,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 134
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Frames per second, delivered and dropped",
+      "description": "Animation frames of all visible page loads, each second. Dropped frames are estimated from long gaps between frames.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (outcome) (rate(lag_frames{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 59,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 135
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Dropped frame ratio",
+      "description": "Dropped frames divided by all frames.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.05 },
-              { "color": "red", "value": 0.2 }
-            ]
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
           }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum(rate(lag_frames{service_name=~\"$service_name\", outcome=\"dropped\"}[$__rate_interval])) / sum(rate(lag_frames{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "dropped",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 60,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 135
       }
     },
     {
-      "title": "Idle Availability & Memory",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
-      "collapsed": false
-    },
-    {
-      "title": "Idle Time Remaining (ms)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 62 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "title": "Frame delta p50 / p95 / p99",
+      "description": "The time between two animation frame callbacks. 16.7 ms is 60 frames per second.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
-          "expr": "rate(lag_idle_time_remaining_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_idle_time_remaining_histogram_count{service_name=~\"$service\"}[1m])",
-          "legendFormat": "avg idle time"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
         }
       ],
-      "fieldConfig": {
-        "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } }
+      "id": 61,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 135
       }
     },
     {
-      "title": "Idle Callback Timeout Rate",
-      "type": "gauge",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 62 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "type": "row",
+      "title": "Idle time (IdleAvailabilityMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 62,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 143
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Idle time remaining p10 / p50 / p90",
+      "description": "The idle time that was available when an idle callback ran. Low values show a busy main thread.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
-          "expr": "lag_idle_timeout_rate_gauge{service_name=~\"$service\"}",
-          "legendFormat": "timeout rate"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.1, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p10",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.9, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p90",
+          "range": true,
+          "instant": false
         }
       ],
+      "id": 63,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 144
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Idle gap p50 / p95 / p99",
+      "description": "The time between two idle callbacks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 64,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 144
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Idle callbacks per minute, by timed_out",
+      "description": "Idle callbacks, each minute. A callback that timed out ran because no idle period came in time.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (timed_out) (rate(lag_idle_callbacks{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "timed out: {{timed_out}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 65,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 144
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Idle callbacks that timed out",
+      "description": "Idle callbacks that timed out, divided by all idle callbacks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.1 },
-              { "color": "red", "value": 0.5 }
-            ]
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
           }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum(rate(lag_idle_callbacks{service_name=~\"$service_name\", timed_out=\"true\"}[$__rate_interval])) / sum(rate(lag_idle_callbacks{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "timed out",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 66,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 144
       }
     },
     {
-      "title": "Memory Used (MB)",
+      "type": "row",
+      "title": "Memory (MemoryMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 67,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 152
+      }
+    },
+    {
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 62 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "title": "Used JS heap p50 / p95, by source",
+      "description": "The used heap memory of each sample. Modern: performance.measureUserAgentSpecificMemory(). Legacy: performance.memory.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
-          "expr": "rate(lag_memory_used_bytes_histogram_sum{service_name=~\"$service\"}[1m]) / rate(lag_memory_used_bytes_histogram_count{service_name=~\"$service\"}[1m]) / 1024 / 1024",
-          "legendFormat": "avg used MB"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{source}}",
+          "range": true,
+          "instant": false
         },
         {
-          "expr": "lag_memory_usage_percent_gauge{service_name=~\"$service\"}",
-          "legendFormat": "% of limit"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{source}}",
+          "range": true,
+          "instant": false
         }
       ],
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }
+      "id": 68,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 153
       }
     },
     {
-      "title": "Page Lifecycle (FP, FCP, LCP)",
+      "type": "timeseries",
+      "title": "Heap usage ratio p50 / p95",
+      "description": "The used heap divided by the heap limit. Only the legacy source supplies the limit.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 69,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 153
+      }
+    },
+    {
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
-      "collapsed": false
-    },
-    {
-      "title": "First Paint",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 71 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        { "expr": "lag_paint_first_paint_gauge{service_name=~\"$service\"}", "legendFormat": "FP" }
-      ],
-      "fieldConfig": { "defaults": { "unit": "ms" } }
-    },
-    {
-      "title": "First Contentful Paint",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 71 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
-      "targets": [
-        { "expr": "lag_paint_first_contentful_paint_gauge{service_name=~\"$service\"}", "legendFormat": "FCP" }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1800 },
-              { "color": "red", "value": 3000 }
-            ]
-          }
-        }
+      "title": "Compute pressure (ComputePressureMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 70,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 161
       }
     },
     {
-      "title": "Largest Contentful Paint",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 71 },
-      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "type": "timeseries",
+      "title": "Mean pressure state, by source",
+      "description": "The mean compute pressure state of the records: 0 nominal, 1 fair, 2 serious, 3 critical.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 3,
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "lag_lcp_gauge{service_name=~\"$service\"}", "legendFormat": "LCP" }
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_avg(sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "{{source}}",
+          "range": true,
+          "instant": false
+        }
       ],
+      "id": 71,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 162
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Records at serious or critical pressure, by source",
+      "description": "Records with the state serious (2) or critical (3), divided by all records.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "1 - histogram_fraction(-Inf, 1.5, sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "{{source}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 72,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 162
+      }
+    },
+    {
+      "type": "row",
+      "title": "GC, page lifecycle and timer throttling",
+      "collapsed": false,
+      "panels": [],
+      "id": 73,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 170
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC events per minute",
+      "description": "Garbage collections that the GC signal detector saw, each minute, for all page loads.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum (rate(lag_gc_events{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "GC events/min",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 74,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 171
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Lifecycle transitions per minute",
+      "description": "Page lifecycle transitions, each minute, by the states and the trigger event.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (from, to, trigger) (rate(lag_lifecycle_transitions{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{from}} → {{to}} ({{trigger}})",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 75,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 171
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Throttled timer calibrations",
+      "description": "Timer calibration rounds that found throttled timers, divided by all rounds. Browsers throttle the timers of hidden pages and of pages in power-saving modes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum(rate(lag_timer_calibrations{service_name=~\"$service_name\", throttled=\"true\"}[$__rate_interval])) / sum(rate(lag_timer_calibrations{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "throttled",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 76,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 171
+      }
+    },
+    {
+      "type": "row",
+      "title": "Browser reports (BrowserReportMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 77,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 179
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Browser reports per minute, by type",
+      "description": "Reports from the Reporting API: interventions and deprecations.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * sum by (type) (rate(lag_browser_reports{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "legendFormat": "{{type}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 78,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 180
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent browser reports (events)",
+      "description": "The latest lag.browser_report events.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | label_format report_id=id",
+          "legendFormat": "",
+          "queryType": "range",
+          "maxLines": 200
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "format": "auto",
+            "replace": false,
+            "keepTime": false
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "service_name",
+                "type",
+                "report_id",
+                "message",
+                "source_file",
+                "line_number"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Time": 0,
+              "service_name": 1,
+              "type": 2,
+              "report_id": 3,
+              "message": 4,
+              "source_file": 5,
+              "line_number": 6
+            },
+            "renameByName": {
+              "service_name": "Service",
+              "type": "Type",
+              "report_id": "ID",
+              "message": "Message",
+              "source_file": "Source file",
+              "line_number": "Line"
+            }
+          }
+        }
+      ],
+      "id": 79,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 180
+      }
+    },
+    {
+      "type": "row",
+      "title": "Shared-memory liveness (SharedLivenessMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 80,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 188
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Liveness block duration p50 / p95 / p99",
+      "description": "The duration of each main-thread block that a worker saw through shared memory. Only cross-origin isolated pages have this monitor.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 2500 },
-              { "color": "red", "value": 4000 }
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 81,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 189
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Liveness blocks per minute",
+      "description": "Main-thread blocks that the shared-memory watcher saw, each minute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * histogram_count(sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "legendFormat": "blocks/min",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 82,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 189
+      }
+    },
+    {
+      "type": "row",
+      "title": "Events (Loki)",
+      "collapsed": false,
+      "panels": [],
+      "id": 83,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 197
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Events per minute, by event name",
+      "description": "Lag events in Loki in the minute before each point. event_name is an index label.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "interval": "15s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (event_name) (count_over_time({service_name=~\"$service_name\", event_name=~\".+\"} [1m]))",
+          "legendFormat": "{{event_name}}",
+          "queryType": "range"
+        }
+      ],
+      "id": 84,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 198
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent hangs and stalls",
+      "description": "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
             ]
           }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service_name\", event_name=~\"lag.main_thread.hang|lag.stall\"}",
+          "legendFormat": "",
+          "queryType": "range",
+          "maxLines": 200
         }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "format": "auto",
+            "replace": false,
+            "keepTime": false
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "service_name",
+                "event_name",
+                "phase",
+                "kind",
+                "duration_ms",
+                "scope_name",
+                "lag_page_view_id",
+                "lag_hang_page_id",
+                "session_id",
+                "service_instance_id"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Time": 0,
+              "service_name": 1,
+              "event_name": 2,
+              "phase": 3,
+              "kind": 4,
+              "duration_ms": 5,
+              "scope_name": 6,
+              "lag_page_view_id": 7,
+              "lag_hang_page_id": 8,
+              "session_id": 9,
+              "service_instance_id": 10
+            },
+            "renameByName": {
+              "service_name": "Service",
+              "event_name": "Event",
+              "phase": "Phase",
+              "kind": "Kind",
+              "duration_ms": "Duration",
+              "scope_name": "Sender",
+              "lag_page_view_id": "Page view",
+              "lag_hang_page_id": "Hung page",
+              "session_id": "Session",
+              "service_instance_id": "Instance"
+            }
+          }
+        }
+      ],
+      "id": 85,
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 205
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent clock jumps",
+      "description": "The latest lag.clock.jump events, with the size of the jump.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Magnitude"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Skew"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lateness"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"}",
+          "legendFormat": "",
+          "queryType": "range",
+          "maxLines": 200
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "format": "auto",
+            "replace": false,
+            "keepTime": false
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "service_name",
+                "kind",
+                "direction",
+                "magnitude_ms",
+                "skew_ms",
+                "lateness_ms",
+                "lag_page_view_id",
+                "session_id"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Time": 0,
+              "service_name": 1,
+              "kind": 2,
+              "direction": 3,
+              "magnitude_ms": 4,
+              "skew_ms": 5,
+              "lateness_ms": 6,
+              "lag_page_view_id": 7,
+              "session_id": 8
+            },
+            "renameByName": {
+              "service_name": "Service",
+              "kind": "Kind",
+              "direction": "Direction",
+              "magnitude_ms": "Magnitude",
+              "skew_ms": "Skew",
+              "lateness_ms": "Lateness",
+              "lag_page_view_id": "Page view",
+              "session_id": "Session"
+            }
+          }
+        }
+      ],
+      "id": 86,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 215
+      }
+    },
+    {
+      "type": "row",
+      "title": "Long range (recording rules)",
+      "collapsed": false,
+      "panels": [],
+      "id": 87,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 222
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 by service (recorded)",
+      "description": "From the recording rules service_name:<metric>:p95_rate5m (5-minute windows, evaluated each minute). Use these panels for long time ranges.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_drift_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} drift",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_macrotask_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} macrotask",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_worker_main_block_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} heartbeat delay",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_loaf_blocking_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} LoAF blocking",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_event_duration_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} event duration",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_frame_delta_histogram:p95_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} frame delta",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 88,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 223
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "p99 by service (recorded)",
+      "description": "From the recording rules service_name:<metric>:p99_rate5m.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_drift_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} drift",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_macrotask_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} macrotask",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_worker_main_block_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} heartbeat delay",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_loaf_blocking_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} LoAF blocking",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_event_duration_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} event duration",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "service_name:lag_frame_delta_histogram:p99_rate5m{service_name=~\"$service_name\"}",
+          "legendFormat": "{{service_name}} frame delta",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 89,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 223
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fleet p95 from recorded rates",
+      "description": "The p95 of all selected services, from the recorded native-histogram rates service_name:<metric>:rate5m. A sum of recorded rates is correct; a sum of recorded quantiles is not.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_drift_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "drift",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_macrotask_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "macrotask",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_worker_main_block_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "heartbeat delay",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_loaf_blocking_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "LoAF blocking",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_event_duration_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "event duration",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum(service_name:lag_frame_delta_histogram:rate5m{service_name=~\"$service_name\"}))",
+          "legendFormat": "frame delta",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 90,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 231
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Web Vitals p75 from recorded rates",
+      "description": "The p75 of each vital, from the recorded rates service_name_navigation_type:<metric>:rate5m. CLS uses the right axis.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CLS"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(service_name_navigation_type:lag_web_vital_inp_histogram:rate5m{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}))",
+          "legendFormat": "INP",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(service_name_navigation_type:lag_web_vital_cls_histogram:rate5m{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}))",
+          "legendFormat": "CLS",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(service_name_navigation_type:lag_web_vital_lcp_histogram:rate5m{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}))",
+          "legendFormat": "LCP",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(service_name_navigation_type:lag_web_vital_fcp_histogram:rate5m{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}))",
+          "legendFormat": "FCP",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.75, sum(service_name_navigation_type:lag_web_vital_ttfb_histogram:rate5m{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}))",
+          "legendFormat": "TTFB",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 91,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 231
       }
     }
-  ],
-  "schemaVersion": 39,
-  "tags": ["lag", "performance", "otel"],
-  "templating": {
-    "list": [
-      {
-        "current": { "selected": false, "text": "All", "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "mimir" },
-        "definition": "label_values(lag_drift_histogram_count, service_name)",
-        "includeAll": true,
-        "name": "service",
-        "query": "label_values(lag_drift_histogram_count, service_name)",
-        "refresh": 2,
-        "type": "query"
-      }
-    ]
-  },
-  "time": { "from": "now-15m", "to": "now" },
-  "timepicker": {},
-  "timezone": "browser",
-  "title": "Lag Monitor",
-  "uid": "lag-monitor",
-  "version": 1
+  ]
 }

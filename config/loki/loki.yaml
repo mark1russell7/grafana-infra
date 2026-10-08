@@ -18,6 +18,27 @@ limits_config:
   allow_structured_metadata: true
   volume_enabled: true
 
+  # OTLP logs (the lag events). Only two low-cardinality values become index
+  # labels: service_name and event_name. Loki stores every other resource
+  # attribute and log attribute as structured metadata, with dots changed to
+  # underscores: service_instance_id, session_id, lag_page_view_id,
+  # browser_web_vital_value and the other event attributes.
+  otlp_config:
+    resource_attributes:
+      # The default list makes service.instance.id an index label. Each page
+      # load has a new value, so that list is not used.
+      ignore_defaults: true
+      attributes_config:
+        - action: index_label
+          attributes:
+            - service.name
+    log_attributes:
+      # Alloy copies the EventName field of each record to event.name.
+      # There are few event names, so it is a good stream label.
+      - action: index_label
+        attributes:
+          - event.name
+
 schema_config:
   configs:
     - from: "2024-01-01"

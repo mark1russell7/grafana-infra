@@ -167,7 +167,7 @@
       "targets": [
         {
           "datasource": { "type": "loki" },
-          "expr": "sum(count_over_time({} [1h]))"
+          "expr": "sum(count_over_time({service_name=~\".+\"} [1h]))"
         }
       ]
     },
