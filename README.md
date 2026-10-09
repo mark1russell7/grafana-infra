@@ -351,7 +351,8 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - `fleet.png`: the dashboard for all page loads.
 - `page-<index>.png`: one page load, with every annotation layer on.
 - `table-<title>.png`: each table of events, and the table of the page view traces.
-- `trace-page-1.png`: the trace of the first view of page load 1. The script opens it with the Trace link of the page views table.
+- `table-page-views-page-1.png`: the page views table of page load 1, with the Trace column.
+- `trace-page-1.png`: the trace of the first view of page load 1. The script opens it with a click on the Trace link of that table.
 - `trace-abandoned-hang.png`: the trace of the page that hung, with the span of the abandoned hang and its references (the parent and the link).
 - `explore-loki-trace-link.png`: a `lag.page_view.start` event in Explore, with the link to its trace.
 

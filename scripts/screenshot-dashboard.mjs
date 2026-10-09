@@ -7,9 +7,11 @@
  * - fleet.png: the dashboard as provisioned (all page loads).
  * - table-<title>.png: each table of events, and the table of the page view
  *   traces, in view after its query.
- * - trace-page-<index>.png: the trace of the first view of a page load. The
- *   script opens it through the Trace link of the page views table, thus the
- *   screenshot also shows that the link works.
+ * - table-page-views-page-<index>.png: the page views table of one page
+ *   load, with the Trace column.
+ * - trace-page-<index>.png: the trace of the first view of that page load.
+ *   The script opens it with a click on the Trace link of the table, thus
+ *   the screenshot also shows that the link works.
  * - trace-abandoned-hang.png: the trace of the page that hung, with the span
  *   of the abandoned hang open, and its link to the view that reported it.
  * - explore-loki-trace-link.png: a lag.page_view.start event in Explore, with
@@ -93,7 +95,8 @@ page.on("response", async (response) => {
     });
 });
 
-async function shoot(path, file) {
+/** Opens a dashboard in the time range of the sample, and loads all its panels. */
+async function open(path) {
     await page.goto(`${args.grafana}${path}${path.includes("?") ? "&" : "?"}from=${from}&to=${to}&kiosk`, { waitUntil : "networkidle", timeout : 120_000 });
     // The panels load lazily: scroll to the end and back, then wait for the queries
     await page.evaluate(async () => {
@@ -105,8 +108,20 @@ async function shoot(path, file) {
     });
     await page.waitForLoadState("networkidle", { timeout : 120_000 }).catch(() => undefined);
     await page.waitForTimeout(2_000);
+}
+
+async function shoot(path, file) {
+    await open(path);
     await page.screenshot({ path : join(args.out, file), fullPage : true });
     console.log(`Wrote ${join(args.out, file)}`);
+}
+
+/** The panel with this title, in view after its query. */
+async function panelInView(title) {
+    const panel = page.locator(`[data-viz-panel-key], section`).filter({ has : page.getByText(title, { exact : true }) }).first();
+    await panel.scrollIntoViewIfNeeded({ timeout : 10_000 });
+    await page.waitForTimeout(4_000);
+    return panel;
 }
 
 await shoot("/d/lag-monitor/lag-monitor", "fleet.png");
@@ -118,10 +133,8 @@ const tableTitles = [
     "LoAF attribution: blocking time by script (events)", "Page view traces",
 ];
 for (const title of tableTitles) {
-    const panel = page.locator(`[data-viz-panel-key], section`).filter({ has : page.getByText(title, { exact : true }) }).first();
     try {
-        await panel.scrollIntoViewIfNeeded({ timeout : 10_000 });
-        await page.waitForTimeout(4_000);
+        const panel = await panelInView(title);
         const file = `table-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}.png`;
         await panel.screenshot({ path : join(args.out, file) });
         // The data links of the cells, for example the Trace links
@@ -141,9 +154,13 @@ const tempoPane = (traceId) => ({
     queries : [{ refId : "A", datasource : { type : "tempo", uid : "tempo" }, queryType : "traceql", query : traceId }],
 });
 
-/** Opens a trace in Explore, waits for the trace view, does `prepare` and takes the screenshot. */
-async function shootTrace(url, file, prepare) {
-    await page.goto(url, { waitUntil : "networkidle", timeout : 120_000 });
+/**
+ * Opens a trace in Explore (with `url`, or with `navigate`), waits for the
+ * trace view, does `prepare` and takes the screenshot.
+ */
+async function shootTrace(url, file, prepare, navigate) {
+    if (navigate) await navigate();
+    else await page.goto(url, { waitUntil : "networkidle", timeout : 120_000 });
     await page.getByText("lag.page_view").first().waitFor({ timeout : 30_000 });
     await page.waitForTimeout(1_500);
     if (prepare) await prepare();
@@ -151,18 +168,26 @@ async function shootTrace(url, file, prepare) {
     console.log(`Wrote ${join(args.out, file)}`);
 }
 
-// 1. The trace of the first view of a page load, through the Trace link of the page views table
+// 1. The trace of the first view of a page load, through the Trace link of the page views table. The
+//    table of all page loads shows only its latest rows, thus the script selects the page load first.
 const tracePage = summary.pages.find(p => p.index === Number(args["trace-page"]));
 const traceView = tracePage?.views[0];
 if (traceView) {
     const file = `trace-page-${tracePage.index}.png`;
-    const link = tables.find(t => t.title === "Recent page views and lifecycle transitions")?.links?.find(l => l.text === traceView.traceId);
+    const tableFile = `table-page-views-page-${tracePage.index}.png`;
     try {
-        await shootTrace(link ? new URL(link.href, args.grafana).href : explore(tempoPane(traceView.traceId)), file);
+        await open(`/d/lag-monitor/lag-monitor?var-service_name=${tracePage.service}&var-instance=${tracePage.instanceId}`);
+        const panel = await panelInView("Recent page views and lifecycle transitions");
+        await panel.screenshot({ path : join(args.out, tableFile) });
+        console.log(`Wrote ${join(args.out, tableFile)}`);
+        const link = panel.locator("a", { hasText : traceView.traceId }).first();
+        const href = await link.getAttribute("href", { timeout : 10_000 }).catch(() => null);
+        // A click on the link, as a user does. Without the link, the trace opens with an Explore URL.
+        await shootTrace(explore(tempoPane(traceView.traceId)), file, undefined, href ? () => link.click() : undefined);
         traces.push({
-            file, traceId : traceView.traceId, viewId : traceView.id, spans : traceView.spans,
-            openedBy : link ? "the Trace link of the page views table" : "an Explore URL: the page views table had no Trace link for this view",
-            link : link?.href,
+            file, table : tableFile, traceId : traceView.traceId, viewId : traceView.id, spans : traceView.spans,
+            openedBy : href ? "a click on the Trace link of the page views table" : "an Explore URL: the page views table had no Trace link for this view",
+            link : href, url : page.url(),
         });
     } catch (error) {
         traces.push({ file, traceId : traceView.traceId, error : String(error).slice(0, 300) });
