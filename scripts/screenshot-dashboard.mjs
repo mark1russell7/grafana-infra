@@ -101,7 +101,7 @@ await shoot("/d/lag-monitor/lag-monitor", "fleet.png");
 
 // The tables of events, one at a time: each one in view, after its query
 const tables = [];
-for (const title of ["Page loads", "Recent page views and lifecycle transitions", "Recent hangs and stalls", "Recent clock jumps"]) {
+for (const title of ["Page loads", "Recent page views and lifecycle transitions", "Recent hangs and stalls", "Recent clock jumps", "LoAF attribution: blocking time by script (events)"]) {
     const panel = page.locator(`[data-viz-panel-key], section`).filter({ has : page.getByText(title, { exact : true }) }).first();
     try {
         await panel.scrollIntoViewIfNeeded({ timeout : 10_000 });

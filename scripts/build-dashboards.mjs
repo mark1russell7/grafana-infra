@@ -242,9 +242,19 @@ function pageLoadTable(title, description) {
         },
         options : { showHeader : true, cellHeight : "sm", sortBy : [{ displayName : "Events", desc : true }] },
         targets : [lokiInstant(expr, "")],
+        // As metricTable: one column for each label, then one row for each series. The value field of one
+        // instant query is "Value" or "Value #A", by the version of Grafana.
         transformations : [
-            { id : "reduce", options : { reducers : ["lastNotNull"], mode : "seriesToRows", labelsToFields : true } },
-            { id : "organize", options : { excludeByName : { Field : true }, renameByName : { service_instance_id : "Page load", session_id : "Session", "Last *" : "Events" } } },
+            { id : "labelsToFields", options : { mode : "columns" } },
+            { id : "merge", options : {} },
+            {
+                id : "organize",
+                options : {
+                    excludeByName : { Time : true },
+                    indexByName : { service_instance_id : 0, session_id : 1, Value : 2, "Value #A" : 2 },
+                    renameByName : { service_instance_id : "Page load", session_id : "Session", Value : "Events", "Value #A" : "Events" },
+                },
+            },
         ],
     });
 }
