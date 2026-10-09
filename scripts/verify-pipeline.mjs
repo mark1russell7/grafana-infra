@@ -224,15 +224,25 @@ async function lokiEvents() {
     }
 
     // No event is lost: Loki drops an entry with the same timestamp and line as the previous one.
+    // The last records of the sample (the final vitals and transitions of each page at its close) can
+    // still be in the batch of Alloy when this check starts. Thus it waits up to 30 s for them.
     if (summary) {
         const rangeS = Math.ceil((toMs - fromMs) / 1000);
-        for (const event of EVENTS) {
-            const sent = summary.counts.events[event.name] ?? 0;
+        const storedCount = async (name) => {
             const result = await lokiGet("/loki/api/v1/query", {
-                query : `sum(count_over_time({service_name=~"${serviceRegex}", event_name="${event.name}"}[${rangeS}s]))`,
+                query : `sum(count_over_time({service_name=~"${serviceRegex}", event_name="${name}"}[${rangeS}s]))`,
                 time : String(toMs / 1000),
             });
-            const stored = Number(result.data?.result?.[0]?.value?.[1] ?? 0);
+            return Number(result.data?.result?.[0]?.value?.[1] ?? 0);
+        };
+        const deadline = Date.now() + 30_000;
+        for (const event of EVENTS) {
+            const sent = summary.counts.events[event.name] ?? 0;
+            let stored = await storedCount(event.name);
+            while (stored < sent && Date.now() < deadline) {
+                await new Promise(resolve => setTimeout(resolve, 2_000));
+                stored = await storedCount(event.name);
+            }
             check(stored === sent, `${event.name}: Loki has ${stored} of the ${sent} events that the sample sent`);
         }
     }
