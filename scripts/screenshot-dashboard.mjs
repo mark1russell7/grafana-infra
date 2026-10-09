@@ -15,7 +15,7 @@
  */
 
 import { parseArgs } from "node:util";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
@@ -52,6 +52,24 @@ if (!saved.ok) throw new Error(`Could not save the review dashboard: HTTP ${save
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport : { width : 1600, height : 1200 }, deviceScaleFactor : 1 });
 
+// For a review of the annotation layers: each query that Grafana sends for them, and its result
+const annotationQueries = [];
+const consoleErrors = [];
+page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+page.on("response", async (response) => {
+    if (!response.url().includes("/api/ds/query")) return;
+    const request = response.request().postData() ?? "";
+    if (!request.includes("logfmt")) return;
+    let body;
+    try { body = await response.json(); } catch { body = undefined; }
+    const results = body?.results ?? {};
+    annotationQueries.push({
+        status : response.status(),
+        queries : JSON.parse(request).queries?.map(q => ({ refId : q.refId, expr : q.expr, queryType : q.queryType })),
+        frames : Object.fromEntries(Object.entries(results).map(([refId, r]) => [refId, { error : r.error, frames : r.frames?.length ?? 0, rows : r.frames?.[0]?.data?.values?.[0]?.length ?? 0 }])),
+    });
+});
+
 async function shoot(path, file) {
     await page.goto(`${args.grafana}${path}${path.includes("?") ? "&" : "?"}from=${from}&to=${to}&kiosk`, { waitUntil : "networkidle", timeout : 120_000 });
     // The panels load lazily: scroll to the end and back, then wait for the queries
@@ -75,3 +93,5 @@ for (const index of args.pages.split(",").map(Number)) {
     await shoot(`/d/lag-monitor-review/lag-monitor-review?var-service_name=${sample.service}&var-instance=${sample.instanceId}`, `page-${index}.png`);
 }
 await browser.close();
+writeFileSync(join(args.out, "annotations.json"), JSON.stringify({ annotationQueries, consoleErrors }, null, 2));
+console.log(`Annotation queries: ${annotationQueries.length}; console errors: ${consoleErrors.length}`);
