@@ -209,7 +209,6 @@ class Page {
         this.state = "active";
         this.blocked = false;
         this.views = [];
-        this.newView(profile.navigation);
 
         const resource = resourceFromAttributes({
             "service.name" : profile.service,
@@ -248,6 +247,8 @@ class Page {
             processors : [new BatchLogRecordProcessor({ exporter : new OTLPLogExporter({ url : `${ENDPOINT}/v1/logs` }), scheduledDelayMillis : 1000 })],
         });
         this.logger = this.loggerProvider.getLogger("@lag/core");
+        // The first page view: its lag.page_view.start event needs the logger
+        this.newView(profile.navigation);
     }
 
     has(feature) {
