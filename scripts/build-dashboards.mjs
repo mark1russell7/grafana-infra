@@ -258,14 +258,20 @@ function pageLoadTable(title, description) {
  * load.
  */
 function annotation(name, eventName, { color, enable = false, title, text, tags }) {
+    // logfmt parses the line of the event (name key=value ...), thus the templates can use each attribute
+    const expr = `${events(`="${eventName}"`)} | logfmt`;
     return {
         name,
         datasource : LOKI,
         enable,
         hide : false,
         iconColor : color,
-        // logfmt parses the line of the event (name key=value ...), thus the templates can use each attribute
-        target : { refId : "Anno", expr : `${events(`="${eventName}"`)} | logfmt`, queryType : "range" },
+        // The Loki datasource of Grafana 13 reads the query and the formats from the annotation itself
+        // (annotationQuery). The target has the same query, for the editor and for verify-pipeline.
+        expr,
+        instant : false,
+        maxLines : 500,
+        target : { refId : "Anno", expr, queryType : "range" },
         titleFormat : title,
         textFormat : text,
         tagKeys : tags,

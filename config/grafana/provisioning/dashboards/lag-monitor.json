@@ -45,6 +45,9 @@
         "enable": true,
         "hide": false,
         "iconColor": "red",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.main_thread.hang\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.main_thread.hang\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -63,6 +66,9 @@
         "enable": true,
         "hide": false,
         "iconColor": "orange",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.stall\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.stall\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -81,6 +87,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "blue",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.page_view.start\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.page_view.start\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -99,6 +108,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "purple",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.lifecycle.transition\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.lifecycle.transition\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -117,6 +129,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "yellow",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.pressure.change\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.pressure.change\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -135,6 +150,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "#8f8f8f",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -153,6 +171,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "#b877d9",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | logfmt",
@@ -171,6 +192,9 @@
         "enable": false,
         "hide": false,
         "iconColor": "#5794f2",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
         "target": {
           "refId": "Anno",
           "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | service_instance_id=~\"$instance\" | logfmt",
