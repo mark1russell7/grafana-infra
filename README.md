@@ -302,7 +302,8 @@ The queries obey these rules:
 - A histogram query first sums the rates of all page loads, then takes the quantile.
 - An example is `histogram_quantile(0.95, sum(rate(x[$__rate_interval])))`.
 - A counter query uses `rate()`.
-- No query groups by `instance` or by session. A query can filter by one `instance` (the Page load variable).
+- No metric query (Mimir) groups by `instance` or by session. A query can filter by one `instance` (the Page load variable).
+- One Loki query groups by page load and session: the Page loads table (`sum by (service_instance_id, session_id)`). It is a `topk(50)` instant query of the event counts over the time range. Thus it gives at most 50 rows, one for each page load, not a time series for each page load. The two fields are structured metadata, not index labels of Loki.
 
 The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$__rate_interval` is 60 seconds or more.
 

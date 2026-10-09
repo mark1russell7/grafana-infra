@@ -7,7 +7,12 @@
  * - Native histograms: aggregate first, then take the quantile:
  *   histogram_quantile(0.95, sum(rate(x[$__rate_interval]))).
  * - Counters: rate(), never the raw cumulative value.
- * - Never group by instance or session.
+ * - A metric query (Mimir) never groups by instance or session. It can
+ *   filter by one instance (the Page load variable).
+ * - One Loki query groups by page load and session: the Page loads table.
+ *   It is a topk(50) instant query of the event counts over the time range.
+ *   Thus it gives at most 50 rows, one for each page load, not a time
+ *   series for each page load. A click on a row selects that page load.
  *
  * Usage: node scripts/build-dashboards.mjs [--list]
  *   --list prints each panel and its queries.
@@ -640,14 +645,15 @@ eventTable("Recent page views and lifecycle transitions",
         widths : { lag_page_view_trace_id : 270 },
     });
 eventTable("Recent hangs and stalls",
-    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (lag.hang.source journal), another open page (peer), or the page itself at its close (self).",
+    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
     events('=~"lag.main_thread.hang|lag.stall"'),
-    ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "session_id", "service_instance_id"],
+    ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "lag_hang_source", "session_id", "service_instance_id"],
     {
         h : 10,
         rename : {
             service_name : "Service", event_name : "Event", phase : "Phase", kind : "Kind", duration_ms : "Duration",
-            scope_name : "Sender", lag_page_view_id : "Page view", lag_hang_page_id : "Hung page", session_id : "Session", service_instance_id : "Instance",
+            scope_name : "Sender", lag_page_view_id : "Page view", lag_hang_page_id : "Hung page", lag_hang_source : "Source", session_id : "Session",
+            service_instance_id : "Instance",
         },
         units : { duration_ms : "ms" },
     });
