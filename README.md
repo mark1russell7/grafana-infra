@@ -51,7 +51,7 @@ Alloy: otelcol.receiver.otlp (CORS for localhost pages)
   └─ traces ───────────────────────────────► batch ──► Tempo  OTLP/gRPC
 ```
 
-Alloy keeps no state. A restart of Alloy loses no metric data, because browsers export cumulative values.
+Alloy keeps no state. A restart of Alloy loses no metric data, because browsers export cumulative values. Traces go to `/v1/traces` on the same port, as metrics and logs.
 
 ### Alloy
 
@@ -121,6 +121,29 @@ quantile_over_time(0.75,
   {service_name="shop", event_name="browser.web_vital"}
   | keep browser_web_vital_name, browser_web_vital_value
   | unwrap browser_web_vital_value [5m]) by (browser_web_vital_name)
+```
+
+### Tempo: the traces of the page views
+
+With a span sink (`createOtelSpanSink`), the lag library sends one trace for each page view:
+
+- The root span `lag.page_view` starts at the start of the view. It ends when the page is hidden for the first time in the view, or at the end of the view. The browser can discard a hidden page without an event, and the exporter sends only the spans that ended. At its end, the span gets the values of the Web Vitals as attributes, for example `lag.web_vital.lcp`.
+- The other spans are in the span of the view: `lag.main_thread.hang`, `lag.stall`, `lag.long_animation_frame`, `lag.page.hidden` and `lag.page.frozen`. Each one has the real start and end of its period. An event of the same period gives only the start and the duration.
+- An abandoned hang that another page reports is in the trace of the page that hung. Its span has a link to the view of the page that reported it.
+- The `lag.page_view.start` event has the identity of the span of the view: `lag.page_view.trace_id` and `lag.page_view.span_id`. Only a sampled span gives them. Loki keeps them as the structured metadata `lag_page_view_trace_id` and `lag_page_view_span_id`.
+- The spans have the same resource as the metrics and the logs: `service.name` and `service.instance.id`. otel-ts puts `session.id` on each span.
+
+The dashboards and the alerts use the events and the metrics. The traces are for the investigation of one page view.
+
+The datasources link the events and the traces:
+
+- Loki: the derived field `Page view trace` reads the structured metadata `lag_page_view_trace_id` (a label matcher). In Explore, a `lag.page_view.start` event shows the link "Open the trace of the page view".
+- Tempo: "Logs for this span" shows the lag events of the same page load (`service_instance_id`), from 1 minute before the span to 1 minute after it.
+
+To find a trace without the dashboard, use this TraceQL query in Explore with the Tempo datasource:
+
+```traceql
+{ name = "lag.page_view" && resource.service.name = "shop" }
 ```
 
 ### Recording rules
@@ -204,6 +227,17 @@ Use the same `resource` for the `LoggerProvider`. Send an event with `logger.emi
 
 With otel-ts, set `histogramAggregation: "exponential"`. otel-ts sets the other items.
 
+For the traces of the page views, give the lag monitors a span sink:
+
+```ts
+import * as api from "@opentelemetry/api";
+import { createOtelSpanSink } from "@lag/core";
+
+const spans = createOtelSpanSink(api.trace.getTracer("@lag/core"), api);
+```
+
+Use the same `resource` for the `TracerProvider`, and send the spans with the OTLP/HTTP exporter to `/v1/traces`. Flush the tracer provider when the page becomes hidden: the span of a view ends at that time. otel-ts registers its tracer provider as the global provider, and it flushes it.
+
 ## The Lag Monitor dashboard
 
 `scripts/build-dashboards.mjs` generates `config/grafana/provisioning/dashboards/lag-monitor.json`. Do not edit the JSON file. Edit the script, then start it:
@@ -255,6 +289,14 @@ The dashboard has one row for each monitor family:
 
 Loki panels show the events: the page loads and their sessions, recent page views and lifecycle transitions, recent hangs and stalls, clock jumps, browser reports, LoAF attribution and Web Vitals values. The last row uses the recording rules.
 
+### The Trace link
+
+The table "Recent page views and lifecycle transitions" has a Trace column: the `lag_page_view_trace_id` of each `lag.page_view.start` event. A click on a trace ID opens the trace of the page view in Explore, with the Tempo datasource. The link is an internal data link to the datasource `tempo`. Grafana makes the URL of Explore from the trace ID. A lifecycle transition has no trace ID, and a view whose span was not sampled has no trace ID.
+
+The trace shows the view as a timeline: the span of the view, and its hangs, stalls, long animation frames and hidden or frozen periods.
+
+The row "Page view traces (Tempo)" has a TraceQL search: the traces of the page views in the time range, with their start and duration. It follows the Service and Page load variables. A click on a trace ID opens the trace.
+
 The queries obey these rules:
 
 - A histogram query first sums the rates of all page loads, then takes the quantile.
@@ -287,21 +329,34 @@ The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$_
 
 `scripts/send-sample-data.mjs` uses the OpenTelemetry JS SDK in the same way as a browser. It simulates six page loads of two services. Each page load has its own `service.instance.id`. The script records each metric of the lag catalog and sends each lag event. It also posts hang reports in the JSON shape of the lag worker, with `fetch` and `keepalive`.
 
+The script also sends the spans, as `createOtelSpanSink` sends them: one trace for each page view, with the hangs, stalls, long animation frames and hidden and frozen periods of the view in it. It also sends the trace of an earlier page that hung and closed during its hang. Only the trace of that page is in the sample, not its metrics or events. A sample page reports the abandoned hang from the hang journal: the span of the hang is in the trace of the page that hung, with a link to the view of the sample page.
+
 `scripts/verify-pipeline.mjs` checks these items:
 
-- Alloy, Mimir, Loki and Grafana are ready.
+- Alloy, Mimir, Loki, Tempo and Grafana are ready.
 - The receiver answers the CORS preflight of localhost pages. It does not answer it for other origins.
 - Mimir stores each catalog metric under its catalog name, and each histogram as a native histogram.
 - The `instance` label is the `service.instance.id`. No series has a `session_id` label.
 - The recording rules are healthy and have data.
 - Loki has only the index labels `service_name` and `event_name`, and it has all the lag events.
+- Tempo has one trace for each page view of the sample. The root span `lag.page_view` has the ID of the view, and each other span of the trace has the root as its parent. The spans have the attributes of the span catalog.
+- The abandoned hang is in the trace of the page that hung, and it has a link to the view that reported it.
+- The `lag.page_view.start` events have the trace ID and the span ID of their view.
 - Grafana loads the dashboard, and each panel query and each annotation layer gives data.
+- Grafana reads the traces from Tempo. The Loki derived field and the Trace column link to Tempo.
 
-`scripts/screenshot-dashboard.mjs` takes screenshots of the dashboard after the sample data: `fleet.png` for all page loads, and `page-<index>.png` for one page load with every annotation layer on.
+`scripts/screenshot-dashboard.mjs` takes screenshots after the sample data:
+
+- `fleet.png`: the dashboard for all page loads.
+- `page-<index>.png`: one page load, with every annotation layer on.
+- `table-<title>.png`: each table of events, and the table of the page view traces.
+- `trace-page-1.png`: the trace of the first view of page load 1. The script opens it with the Trace link of the page views table.
+- `trace-abandoned-hang.png`: the trace of the page that hung, with the span of the abandoned hang and its references (the parent and the link).
+- `explore-loki-trace-link.png`: a `lag.page_view.start` event in Explore, with the link to its trace.
 
 The CI workflow `.github/workflows/verify.yml` does all of this on each pull request: it starts the stack, sends the sample data, verifies the pipeline and uploads the screenshots as the artifact `dashboard-screenshots`.
 
-If Grafana uses a different port, add `--grafana http://localhost:3300`. To compare `scripts/lib/lag-catalog.mjs` with the lag catalog, add `--catalog ../lag/packages/lag/src/metric-catalog.ts`.
+If Grafana uses a different port, add `--grafana http://localhost:3300`. To compare `scripts/lib/lag-catalog.mjs` with the lag catalog (metrics, events and spans), add `--catalog ../lag/packages/lag/src/metric-catalog.ts`.
 
 ## Troubleshooting
 
@@ -310,3 +365,5 @@ If Grafana uses a different port, add `--grafana http://localhost:3300`. To comp
 - Mimir rejects samples: look at `cortex_discarded_samples_total` at <http://localhost:9009/metrics>.
 - The browser shows a CORS error: add the page origin to `allowed_origins` in `config/alloy/config.alloy`. Then restart Alloy.
 - A panel shows the error "too many outstanding requests": increase `max_outstanding_requests_per_tenant` in `config/mimir/mimir.yaml`.
+- The Trace column is empty: the app gives no span sink to the lag monitors, or the sampler did not sample the span of the view. Without a sampled span, the `lag.page_view.start` event has no trace ID.
+- The trace of a view has no root span: the page closed before the span of the view ended, or before the exporter sent it. Flush the tracer provider when the page becomes hidden.
