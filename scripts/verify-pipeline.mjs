@@ -13,7 +13,8 @@
  *    catalog event, the event attributes as structured metadata, and the
  *    worker's own JSON hang report.
  * 6. Grafana loads the Lag Monitor dashboard, and every query of every
- *    panel returns data through the Grafana datasource API.
+ *    panel and every annotation layer returns data through the Grafana
+ *    datasource API.
  *
  * Usage:
  *   node scripts/verify-pipeline.mjs [--summary sample-summary.json]
@@ -244,7 +245,7 @@ async function lokiEvents() {
         const entry = result.data?.result?.[0]?.values?.[0];
         const metadata = entry?.[2]?.structuredMetadata ?? {};
         const expected = event.attributes
-            .filter(a => !a.endsWith("*") && !(event.name === "lag.main_thread.hang" && a === "lag.hang.page_id"))
+            .filter(a => !a.endsWith("*") && !(event.optional ?? []).includes(a))
             .map(a => a.replaceAll(".", "_"));
         const missing = ["service_instance_id", "lag_page_view_id", ...expected].filter(k => !(k in metadata));
         check(entry && missing.length === 0, `${event.name}: structured metadata has the event attributes and service_instance_id`,
@@ -280,7 +281,9 @@ async function lokiEvents() {
 function substitute(expr) {
     return expr
         .replaceAll("$service_name", serviceRegex)
-        .replaceAll("$navigation_type", ".+");
+        .replaceAll("$navigation_type", ".+")
+        .replaceAll("$instance", ".+")
+        .replaceAll("${session_id:regex}", "");
 }
 
 function frameHasData(frame) {
@@ -349,6 +352,21 @@ async function grafanaDashboard() {
     }
     const good = rows.filter(r => r.ok).length;
     info(`${good} of ${rows.length} panel queries returned data`);
+
+    // Each annotation layer finds events, and each event line has the fields of its templates
+    for (const layer of dashboard.annotations.list.filter(a => !a.builtIn)) {
+        const query = { refId : "Anno", datasource : layer.datasource, expr : substitute(layer.target.expr), queryType : "range", maxLines : 100 };
+        const response = await getJson(`${args.grafana}/api/ds/query`, {
+            method : "POST",
+            headers,
+            body : JSON.stringify({ queries : [query], from : String(fromMs), to : String(toMs) }),
+        });
+        const result = response.body?.results?.Anno;
+        const frames = result?.frames ?? [];
+        const withData = frames.filter(frameHasData).length;
+        check(!result?.error && withData > 0, `annotation "${layer.name}": ${result?.error ? `ERROR ${result.error}` : `${withData} of ${frames.length} frames with data`}`,
+            args.verbose ? query.expr : undefined);
+    }
 }
 
 // ---------------------------------------------------------------------------
