@@ -1,5 +1,5 @@
 /**
- * A copy of the lag metric and event catalog
+ * A copy of the lag metric, event and span catalog
  * (lag/packages/lag/src/metric-catalog.ts): names, kinds, units and the
  * permitted attribute values. The sample-data, dashboard and verification
  * scripts use it. `node scripts/verify-pipeline.mjs --catalog <path>`
@@ -116,9 +116,10 @@ export const EVENTS = [
     { name : "lag.stall", attributes : ["kind", "duration_ms", "lag.page_view.id"] },
     { name : "lag.lifecycle.transition", attributes : ["from", "to", "trigger", "lag.page_view.id"] },
     {
+        // The trace and span IDs are the identity of the span of the view. Only a sampled span gives them.
         name : "lag.page_view.start",
-        attributes : ["navigation_type", "lag.page_view.id", "lag.page_view.url", "lag.page_view.previous_id"],
-        optional : ["lag.page_view.url", "lag.page_view.previous_id"],
+        attributes : ["navigation_type", "lag.page_view.id", "lag.page_view.url", "lag.page_view.previous_id", "lag.page_view.trace_id", "lag.page_view.span_id"],
+        optional : ["lag.page_view.url", "lag.page_view.previous_id", "lag.page_view.trace_id", "lag.page_view.span_id"],
     },
     {
         name : "lag.pressure.change",
@@ -126,6 +127,38 @@ export const EVENTS = [
         optional : ["previous_state"],
     },
 ];
+
+/**
+ * Every span of the catalog (SPAN_CATALOG), in catalog order. Each page view
+ * is a trace: the span lag.page_view is the root, and the other spans are in
+ * it. An abandoned hang is in the trace of the page that hung. `optional`
+ * lists the attributes that some spans of a name do not have.
+ */
+export const SPANS = [
+    {
+        key : "pageView",
+        name : "lag.page_view",
+        attributes : ["lag.page_view.id", "navigation_type", "lag.page_view.url", "lag.web_vital.*"],
+        optional : ["lag.page_view.url"],
+    },
+    {
+        key : "hang",
+        name : "lag.main_thread.hang",
+        attributes : ["phase", "duration_ms", "lag.hang.page_id", "lag.hang.source"],
+        optional : ["lag.hang.page_id", "lag.hang.source"],
+    },
+    { key : "stall", name : "lag.stall", attributes : ["kind", "duration_ms"] },
+    {
+        key : "longAnimationFrame",
+        name : "lag.long_animation_frame",
+        attributes : ["duration_ms", "blocking_duration_ms", "script.invoker", "script.invoker_type", "script.source_url", "script.duration_ms"],
+    },
+    { key : "hidden", name : "lag.page.hidden", attributes : ["trigger"] },
+    { key : "frozen", name : "lag.page.frozen", attributes : ["trigger"] },
+];
+
+/** Span key to definition. */
+export const S = Object.fromEntries(SPANS.map(s => [s.key, s]));
 
 /** Good and poor thresholds of the vitals. A value at or below `good` is good; a value above `poor` is poor. */
 export const VITAL_THRESHOLDS = {

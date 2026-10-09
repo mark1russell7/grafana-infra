@@ -1,8 +1,8 @@
 name: Verify
 
 # The stack end to end: start it, send sample telemetry in the form of the
-# lag library, check every metric, event, panel query and annotation layer,
-# and take screenshots of the dashboard for review.
+# lag library, check every metric, event, trace, panel query and annotation
+# layer, and take screenshots of the dashboard and the traces for review.
 on:
   push:
     branches: [main]
@@ -32,12 +32,13 @@ jobs:
           git diff --exit-code config/grafana/provisioning/dashboards/
       - name: Start the stack
         run: docker compose up -d
-      - name: Wait for Alloy, Mimir, Loki and Grafana
+      - name: Wait for Alloy, Mimir, Loki, Tempo and Grafana
         shell: bash
         run: |
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:12345/-/ready && curl -fsS http://localhost:9009/ready \
-              && curl -fsS http://localhost:3100/ready && curl -fsS http://localhost:3000/api/health; then exit 0; fi
+              && curl -fsS http://localhost:3100/ready && curl -fsS http://localhost:3200/ready \
+              && curl -fsS http://localhost:3000/api/health; then exit 0; fi
             sleep 5
           done
           echo "The stack did not become ready in 5 minutes" >&2

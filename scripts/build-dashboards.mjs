@@ -7,7 +7,12 @@
  * - Native histograms: aggregate first, then take the quantile:
  *   histogram_quantile(0.95, sum(rate(x[$__rate_interval]))).
  * - Counters: rate(), never the raw cumulative value.
- * - Never group by instance or session.
+ * - A metric query (Mimir) never groups by instance or session. It can
+ *   filter by one instance (the Page load variable).
+ * - One Loki query groups by page load and session: the Page loads table.
+ *   It is a topk(50) instant query of the event counts over the time range.
+ *   Thus it gives at most 50 rows, one for each page load, not a time
+ *   series for each page load. A click on a row selects that page load.
  *
  * Usage: node scripts/build-dashboards.mjs [--list]
  *   --list prints each panel and its queries.
@@ -21,6 +26,7 @@ const OUTPUT = fileURLToPath(new URL("../config/grafana/provisioning/dashboards/
 
 const MIMIR = { type : "prometheus", uid : "mimir" };
 const LOKI = { type : "loki", uid : "loki" };
+const TEMPO = { type : "tempo", uid : "tempo" };
 const SERVICE = 'service_name=~"$service_name"';
 const NAV = 'navigation_type=~"$navigation_type"';
 /** One page load (one SDK instance), or all of them. Mimir makes the instance label from service.instance.id. */
@@ -184,8 +190,33 @@ function metricTable(title, description, targets, { w = 12, h = 8, rename = {}, 
     });
 }
 
-/** A table of recent log lines (events), with the chosen structured-metadata fields as columns. */
-function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = {}, units = {} } = {}) {
+/**
+ * A data link that opens the trace with the ID in the cell, in Explore with
+ * the Tempo datasource. It is an internal link: Grafana makes the URL of
+ * Explore, with the time range of the dashboard.
+ */
+const traceLink = (title) => ({
+    title,
+    url : "",
+    internal : {
+        datasourceUid : TEMPO.uid,
+        datasourceName : "Tempo",
+        query : { refId : "A", datasource : TEMPO, queryType : "traceql", query : "${__value.raw}" },
+    },
+});
+
+/**
+ * A table of recent log lines (events), with the chosen structured-metadata
+ * fields as columns. `links` gives the data links of a field, `widths` the
+ * width of its column in pixels, and `mappings` the value mappings of a field.
+ */
+function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = {}, units = {}, links = {}, widths = {}, mappings = {} } = {}) {
+    const properties = {};
+    const add = (name, property) => (properties[rename[name] ?? name] ??= []).push(property);
+    for (const [name, unit] of Object.entries(units)) add(name, { id : "unit", value : unit });
+    for (const [name, value] of Object.entries(links)) add(name, { id : "links", value });
+    for (const [name, value] of Object.entries(widths)) add(name, { id : "custom.width", value });
+    for (const [name, value] of Object.entries(mappings)) add(name, { id : "mappings", value });
     panels.push({
         type : "table",
         title,
@@ -194,10 +225,7 @@ function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = 
         w, h,
         fieldConfig : {
             defaults : { custom : { align : "auto", cellOptions : { type : "auto" } } },
-            overrides : Object.entries(units).map(([name, unit]) => ({
-                matcher : { id : "byName", options : rename[name] ?? name },
-                properties : [{ id : "unit", value : unit }],
-            })),
+            overrides : Object.entries(properties).map(([name, value]) => ({ matcher : { id : "byName", options : name }, properties : value })),
         },
         options : { showHeader : true, cellHeight : "sm", sortBy : [{ displayName : "Time", desc : true }] },
         targets : [{ ...loki(expr, ""), maxLines : 200 }],
@@ -212,6 +240,24 @@ function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = 
                 },
             },
         ],
+    });
+}
+
+/**
+ * A table of the traces that a TraceQL query finds (a Tempo search): one row
+ * for each trace, with its start and its duration. A click on a trace ID
+ * opens the trace.
+ */
+function traceTable(title, description, query, { w = 24, h = 8 } = {}) {
+    panels.push({
+        type : "table",
+        title,
+        description,
+        datasource : TEMPO,
+        w, h,
+        fieldConfig : { defaults : { custom : { align : "auto", cellOptions : { type : "auto" } } }, overrides : [] },
+        options : { showHeader : true, cellHeight : "sm" },
+        targets : [{ datasource : TEMPO, queryType : "traceql", query, limit : 50, tableType : "traces" }],
     });
 }
 
@@ -585,25 +631,31 @@ timeseries("Events per minute, by event name",
 pageLoadTable("Page loads",
     "The page loads (SDK instances) with lag events in the time range, with the number of events. Set Session to see the page loads of one session. A click on a page load sets the Page load variable: then each panel and each annotation shows only that page load.");
 eventTable("Recent page views and lifecycle transitions",
-    "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts.",
+    "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts. Trace: the trace of the page view (lag.page_view.trace_id). A click on it opens the trace in Tempo. The trace shows the view, and its hangs, stalls, long animation frames and hidden periods, with their real start and end. A view whose span was not sampled has no trace.",
     events('=~"lag.page_view.start|lag.lifecycle.transition"'),
-    ["event_name", "navigation_type", "from", "to", "trigger", "lag_page_view_url", "lag_page_view_id", "lag_page_view_previous_id", "session_id", "service_instance_id"],
+    ["event_name", "navigation_type", "from", "to", "trigger", "lag_page_view_url", "lag_page_view_id", "lag_page_view_trace_id", "lag_page_view_previous_id", "session_id", "service_instance_id"],
     {
         h : 9,
         rename : {
             event_name : "Event", navigation_type : "Navigation", from : "From", to : "To", trigger : "Trigger", lag_page_view_url : "URL",
-            lag_page_view_id : "Page view", lag_page_view_previous_id : "Previous view", session_id : "Session", service_instance_id : "Instance",
+            lag_page_view_id : "Page view", lag_page_view_trace_id : "Trace", lag_page_view_previous_id : "Previous view", session_id : "Session",
+            service_instance_id : "Instance",
         },
+        links : { lag_page_view_trace_id : [traceLink("Open the trace of the page view in Tempo")] },
+        // The cell shows "Open trace", not the 32 digits of the ID. The link uses the raw value.
+        mappings : { lag_page_view_trace_id : [{ type : "regex", options : { pattern : "^[0-9a-f]{32}$", result : { text : "Open trace", index : 0 } } }] },
+        widths : { lag_page_view_trace_id : 110 },
     });
 eventTable("Recent hangs and stalls",
-    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (lag.hang.source journal), another open page (peer), or the page itself at its close (self).",
+    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
     events('=~"lag.main_thread.hang|lag.stall"'),
-    ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "session_id", "service_instance_id"],
+    ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "lag_hang_source", "session_id", "service_instance_id"],
     {
         h : 10,
         rename : {
             service_name : "Service", event_name : "Event", phase : "Phase", kind : "Kind", duration_ms : "Duration",
-            scope_name : "Sender", lag_page_view_id : "Page view", lag_hang_page_id : "Hung page", session_id : "Session", service_instance_id : "Instance",
+            scope_name : "Sender", lag_page_view_id : "Page view", lag_hang_page_id : "Hung page", lag_hang_source : "Source", session_id : "Session",
+            service_instance_id : "Instance",
         },
         units : { duration_ms : "ms" },
     });
@@ -616,6 +668,11 @@ eventTable("Recent clock jumps",
         rename : { service_name : "Service", kind : "Kind", direction : "Direction", magnitude_ms : "Magnitude", skew_ms : "Skew", lateness_ms : "Lateness", lag_page_view_id : "Page view", session_id : "Session" },
         units : { magnitude_ms : "ms", skew_ms : "ms", lateness_ms : "ms" },
     });
+
+row("Page view traces (Tempo)");
+traceTable("Page view traces",
+    "The traces of the page views in the time range, from Tempo: one trace for each view. The root span lag.page_view ends when the page is hidden for the first time in the view. The hangs, stalls, long animation frames and hidden periods of the view are spans in it. An abandoned hang is in the trace of the page that hung. A click on a trace ID opens the trace. Select one page load to see only its views.",
+    `{ name = "lag.page_view" && resource.service.name =~ "$service_name" && resource.service.instance.id =~ "$instance" }`);
 
 row("Long range (recording rules, all page loads)");
 const recorded = [
@@ -673,7 +730,7 @@ for (const panel of panels) {
 const dashboard = {
     uid : "lag-monitor",
     title : "Lag Monitor",
-    description : "Main-thread lag of browser pages, from the lag library: native-histogram metrics in Mimir and events in Loki.",
+    description : "Main-thread lag of browser pages, from the lag library: native-histogram metrics in Mimir, events in Loki and the traces of the page views in Tempo.",
     tags : ["lag", "performance", "otel", "browser"],
     editable : true,
     graphTooltip : 1,
@@ -788,6 +845,6 @@ if (process.argv.includes("--list")) {
             continue;
         }
         console.log(`- ${panel.title} [${panel.type}]`);
-        for (const t of panel.targets) console.log(`    ${t.refId}: ${t.expr}`);
+        for (const t of panel.targets) console.log(`    ${t.refId}: ${t.expr ?? t.query}`);
     }
 }

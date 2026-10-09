@@ -12,9 +12,15 @@
  * 5. Loki has only the index labels service_name and event_name, every
  *    catalog event, the event attributes as structured metadata, and the
  *    worker's own JSON hang report.
- * 6. Grafana loads the Lag Monitor dashboard, and every query of every
+ * 6. Tempo has one trace for each page view of the sample. The root span
+ *    lag.page_view has the view ID, and each other span of the trace has
+ *    the root as its parent. The abandoned hang is in the trace of the page
+ *    that hung, with a link to the view that reported it. The
+ *    lag.page_view.start events have the trace ID and the span ID of the view.
+ * 7. Grafana loads the Lag Monitor dashboard, and every query of every
  *    panel and every annotation layer returns data through the Grafana
- *    datasource API.
+ *    datasource API. Grafana reads the traces from Tempo, and the Loki
+ *    datasource links lag_page_view_trace_id to Tempo.
  *
  * Usage:
  *   node scripts/verify-pipeline.mjs [--summary sample-summary.json]
@@ -26,7 +32,7 @@
 
 import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
-import { EVENTS, METRICS } from "./lib/lag-catalog.mjs";
+import { EVENTS, METRICS, SPANS } from "./lib/lag-catalog.mjs";
 
 const { values : args } = parseArgs({
     options : {
@@ -36,6 +42,7 @@ const { values : args } = parseArgs({
         password : { type : "string", default : process.env.GF_SECURITY_ADMIN_PASSWORD ?? "admin" },
         mimir : { type : "string", default : "http://localhost:9009" },
         loki : { type : "string", default : "http://localhost:3100" },
+        tempo : { type : "string", default : "http://localhost:3200" },
         otlp : { type : "string", default : "http://localhost:4318" },
         alloy : { type : "string", default : "http://localhost:12345" },
         catalog : { type : "string" },
@@ -102,6 +109,7 @@ async function readiness() {
         ["Alloy", `${args.alloy}/-/ready`, "ready"],
         ["Mimir", `${args.mimir}/ready`, "ready"],
         ["Loki", `${args.loki}/ready`, "ready"],
+        ["Tempo", `${args.tempo}/ready`, "ready"],
         ["Grafana", `${args.grafana}/api/health`, "ok"],
     ]) {
         try {
@@ -285,6 +293,149 @@ async function lokiEvents() {
 }
 
 // ---------------------------------------------------------------------------
+// Tempo: one trace for each page view
+// ---------------------------------------------------------------------------
+
+/** Tempo gives the IDs in base64, the protobuf JSON form. A hexadecimal ID stays as it is. */
+function hexId(id) {
+    return /^(?:[0-9a-f]{16}|[0-9a-f]{32})$/.test(id) ? id : Buffer.from(id, "base64").toString("hex");
+}
+
+/** OTLP JSON attributes as an object. */
+function attributeMap(list = []) {
+    const valueOf = (v) => v.stringValue ?? (v.intValue !== undefined ? Number(v.intValue) : v.doubleValue ?? v.boolValue);
+    return Object.fromEntries(list.map(a => [a.key, valueOf(a.value ?? {})]));
+}
+
+/** The spans of a trace from the Tempo API. The list is empty when Tempo does not have the trace. */
+async function tempoSpans(traceId) {
+    const { status, body } = await getJson(`${args.tempo}/api/v2/traces/${traceId}`);
+    if (status !== 200 || typeof body !== "object") return [];
+    return (body.trace?.resourceSpans ?? body.batches ?? []).flatMap(rs => {
+        const resource = attributeMap(rs.resource?.attributes);
+        return (rs.scopeSpans ?? []).flatMap(ss => (ss.spans ?? []).map(span => ({
+            name : span.name,
+            spanId : hexId(span.spanId),
+            parentSpanId : span.parentSpanId ? hexId(span.parentSpanId) : undefined,
+            startNs : BigInt(span.startTimeUnixNano),
+            endNs : BigInt(span.endTimeUnixNano),
+            attributes : attributeMap(span.attributes),
+            links : (span.links ?? []).map(l => ({ traceId : hexId(l.traceId), spanId : hexId(l.spanId) })),
+            resource,
+            scope : ss.scope?.name,
+        })));
+    });
+}
+
+/**
+ * The attribute problems of a span: a catalog attribute that is missing, or
+ * an attribute that is not in the catalog. otel-ts adds session.id.
+ */
+function spanAttributeProblems(span) {
+    const definition = SPANS.find(s => s.name === span.name);
+    if (!definition) return [`${span.name} is not in the span catalog`];
+    const permitted = (key) => key === "session.id" || definition.attributes.some(a => a.endsWith("*") ? key.startsWith(a.slice(0, -1)) : a === key);
+    const required = definition.attributes.filter(a => !a.endsWith("*") && !(definition.optional ?? []).includes(a));
+    return [
+        ...required.filter(a => !(a in span.attributes)).map(a => `${span.name}: ${a} is missing`),
+        ...Object.keys(span.attributes).filter(k => !permitted(k)).map(k => `${span.name}: ${k} is not in the catalog`),
+    ];
+}
+
+const countByName = (spans) => {
+    const result = {};
+    for (const span of spans) result[span.name] = (result[span.name] ?? 0) + 1;
+    return result;
+};
+const sortedJson = (object) => JSON.stringify(Object.fromEntries(Object.entries(object).sort(([a], [b]) => a.localeCompare(b))));
+
+/**
+ * The problems of the trace of one page view: the trace must have one root,
+ * the span lag.page_view of the view, from the page load of the view. Each
+ * other span must have the root as its parent, and the trace must have the
+ * spans of the summary.
+ */
+function traceProblems(spans, { spanId, viewId, instanceId, expected }) {
+    const problems = [];
+    const roots = spans.filter(s => !s.parentSpanId);
+    const root = roots.length === 1 ? roots[0] : undefined;
+    if (!root || root.name !== "lag.page_view") problems.push(`roots: ${roots.map(r => r.name).join(", ") || "none"}`);
+    if (root && root.spanId !== spanId) problems.push(`the root is ${root.spanId}, not ${spanId}`);
+    if (root && root.attributes["lag.page_view.id"] !== viewId) problems.push(`the root has lag.page_view.id ${root.attributes["lag.page_view.id"]}`);
+    if (root && root.resource["service.instance.id"] !== instanceId) problems.push(`the root is from ${root.resource["service.instance.id"]}`);
+    if (root && !("lag.web_vital.lcp" in root.attributes)) problems.push("the root has no lag.web_vital.lcp");
+    const children = spans.filter(s => s !== root);
+    const strays = children.filter(s => s.parentSpanId !== spanId);
+    if (strays.length > 0) problems.push(`spans without the root as parent: ${strays.map(s => s.name).join(", ")}`);
+    if (sortedJson(countByName(children)) !== sortedJson(expected)) {
+        problems.push(`the spans in the root are ${sortedJson(countByName(children))}, not ${sortedJson(expected)}`);
+    }
+    problems.push(...spans.flatMap(spanAttributeProblems));
+    const reversed = spans.filter(s => s.endNs < s.startNs);
+    if (reversed.length > 0) problems.push(`spans that end before their start: ${reversed.map(s => s.name).join(", ")}`);
+    return problems;
+}
+
+async function tempoTraces() {
+    section("Tempo: one trace for each page view");
+    if (!summary) {
+        info("no --summary: the trace checks need the trace IDs of the sample");
+        return;
+    }
+    // The spans of the last views (they end at the close of their page) can still be in the batch of Alloy.
+    // Thus the check waits up to 30 s for them.
+    const deadline = Date.now() + 30_000;
+    const fetchTrace = async (traceId, count) => {
+        let spans = await tempoSpans(traceId);
+        while (spans.length < count && Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 2_000));
+            spans = await tempoSpans(traceId);
+        }
+        return spans;
+    };
+    const total = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
+    const describe = (counts) => Object.entries(counts).map(([name, n]) => `${n} ${name}`).join(", ") || "no other spans";
+
+    for (const page of summary.pages) {
+        for (const [index, view] of page.views.entries()) {
+            const spans = await fetchTrace(view.traceId, 1 + total(view.spans));
+            const problems = traceProblems(spans, { spanId : view.spanId, viewId : view.id, instanceId : page.instanceId, expected : view.spans });
+            check(spans.length > 0 && problems.length === 0,
+                `page ${page.index} view ${index} (${view.navigationType}): trace ${view.traceId}, root lag.page_view and ${describe(view.spans)} in it`,
+                problems.join("; ") || undefined);
+        }
+    }
+
+    // An abandoned hang is in the trace of the page that hung, with a link to the view that reported it
+    check((summary.abandonedHangs ?? []).length > 0, `the sample has ${(summary.abandonedHangs ?? []).length} abandoned hangs with a trace`);
+    for (const hang of summary.abandonedHangs ?? []) {
+        const spans = await fetchTrace(hang.traceId, 1 + total(hang.spans));
+        const problems = traceProblems(spans, { spanId : hang.spanId, viewId : hang.viewId, instanceId : hang.instanceId, expected : hang.spans });
+        check(spans.length > 0 && problems.length === 0,
+            `abandoned hang of page ${hang.pageId}: trace ${hang.traceId} of the page that hung, root lag.page_view and ${describe(hang.spans)} in it`,
+            problems.join("; ") || undefined);
+        const span = spans.find(s => s.name === "lag.main_thread.hang");
+        const link = span?.links.find(l => l.traceId === hang.reporter.traceId && l.spanId === hang.reporter.spanId);
+        const reporterView = summary.pages.find(p => p.index === hang.reporter.index)?.views.find(v => v.id === hang.reporter.viewId);
+        const ok = span && span.attributes.phase === "abandoned" && span.attributes["lag.hang.page_id"] === hang.pageId
+            && span.resource["service.instance.id"] === hang.reporter.instanceId && link && reporterView?.spanId === hang.reporter.spanId;
+        check(ok,
+            `the abandoned hang span (phase ${span?.attributes.phase}, source ${span?.attributes["lag.hang.source"]}) is from the reporting page ${hang.reporter.instanceId}, with a link to its view ${hang.reporter.traceId}/${hang.reporter.spanId}`,
+            ok ? undefined : span ? `links: ${JSON.stringify(span.links)}` : "no lag.main_thread.hang span in the trace");
+    }
+
+    // The start event of each view has the identity of the span of the view
+    const result = await lokiGet("/loki/api/v1/query_range", {
+        query : `{service_name=~"${serviceRegex}", event_name="lag.page_view.start"}`, start : nanos(fromMs), end : nanos(Date.now()), limit : "1000",
+    });
+    const metadata = new Map((result.data?.result ?? []).flatMap(s => s.values).map(v => v[2]?.structuredMetadata ?? {}).map(m => [m.lag_page_view_id, m]));
+    const views = summary.pages.flatMap(p => p.views);
+    const linked = views.filter(v => metadata.get(v.id)?.lag_page_view_trace_id === v.traceId && metadata.get(v.id)?.lag_page_view_span_id === v.spanId);
+    check(linked.length === views.length,
+        `lag.page_view.start: ${linked.length} of ${views.length} events have lag_page_view_trace_id and lag_page_view_span_id of their view`);
+}
+
+// ---------------------------------------------------------------------------
 // Grafana: the dashboard and every panel query
 // ---------------------------------------------------------------------------
 
@@ -300,8 +451,8 @@ function frameHasData(frame) {
     const values = frame.data?.values ?? [];
     const fields = frame.schema?.fields ?? [];
     if (values.length === 0) return false;
-    // A log frame: any row. A numeric frame: any non-null number in a value field.
-    if (fields.some(f => f.name === "Line" || f.name === "labels")) return (values[0]?.length ?? 0) > 0;
+    // A log frame or a frame of traces: any row. A numeric frame: any non-null number in a value field.
+    if (fields.some(f => f.name === "Line" || f.name === "labels" || f.name === "traceID")) return (values[0]?.length ?? 0) > 0;
     return fields.some((f, i) => f.type === "number" && (values[i] ?? []).some(v => v !== null && Number.isFinite(v)));
 }
 
@@ -334,17 +485,24 @@ async function grafanaDashboard() {
             current = panel.title;
             continue;
         }
-        const queries = panel.targets.map(t => ({
-            refId : t.refId,
-            datasource : t.datasource ?? panel.datasource,
-            expr : substitute(t.expr),
-            legendFormat : t.legendFormat,
-            ...(t.datasource?.type === "loki" || panel.datasource?.type === "loki"
-                ? { queryType : t.queryType ?? "range", maxLines : t.maxLines ?? 100 }
-                : { range : t.range !== false, instant : t.instant === true }),
-            intervalMs : 15_000,
-            maxDataPoints : 300,
-        }));
+        const queries = panel.targets.map(t => {
+            const datasource = t.datasource ?? panel.datasource;
+            // A TraceQL search: the same query fields as the Tempo query editor
+            if (datasource?.type === "tempo") {
+                return { refId : t.refId, datasource, queryType : t.queryType, query : substitute(t.query), limit : t.limit, tableType : t.tableType };
+            }
+            return {
+                refId : t.refId,
+                datasource,
+                expr : substitute(t.expr),
+                legendFormat : t.legendFormat,
+                ...(datasource?.type === "loki"
+                    ? { queryType : t.queryType ?? "range", maxLines : t.maxLines ?? 100 }
+                    : { range : t.range !== false, instant : t.instant === true }),
+                intervalMs : 15_000,
+                maxDataPoints : 300,
+            };
+        });
         const response = await getJson(`${args.grafana}/api/ds/query`, {
             method : "POST",
             headers,
@@ -357,7 +515,7 @@ async function grafanaDashboard() {
             const ok = !result?.error && withData > 0;
             rows.push({ row : current, panel : panel.title, refId : query.refId, ok, frames : frames.length, withData, error : result?.error });
             check(ok, `[${current}] ${panel.title} / ${query.refId}: ${result?.error ? `ERROR ${result.error}` : `${withData} of ${frames.length} frames with data`}`,
-                ok && !args.verbose ? undefined : query.expr);
+                ok && !args.verbose ? undefined : query.expr ?? query.query);
         }
     }
     const good = rows.filter(r => r.ok).length;
@@ -377,6 +535,41 @@ async function grafanaDashboard() {
         check(!result?.error && withData > 0, `annotation "${layer.name}": ${result?.error ? `ERROR ${result.error}` : `${withData} of ${frames.length} frames with data`}`,
             args.verbose ? query.expr : undefined);
     }
+    await grafanaTraceLinks(dashboard, headers);
+}
+
+/** Grafana reads the traces from Tempo, and the links from the events to the traces are in place. */
+async function grafanaTraceLinks(dashboard, headers) {
+    section("Grafana: the traces and the links to them");
+    // A trace by its ID, as Explore and the trace links read it (the query type traceId of the backend)
+    const samples = summary ? [
+        ...summary.pages.slice(0, 2).map(page => ({ label : `page ${page.index}, first view`, traceId : page.views[0].traceId, spans : page.views[0].spans })),
+        ...(summary.abandonedHangs ?? []).map(hang => ({ label : "abandoned hang", traceId : hang.traceId, spans : hang.spans })),
+    ] : [];
+    for (const sample of samples) {
+        const expected = 1 + Object.values(sample.spans).reduce((a, b) => a + b, 0);
+        const response = await getJson(`${args.grafana}/api/ds/query`, {
+            method : "POST",
+            headers,
+            body : JSON.stringify({ queries : [{ refId : "T", datasource : { type : "tempo", uid : "tempo" }, queryType : "traceId", query : sample.traceId }], from : String(fromMs), to : String(toMs) }),
+        });
+        const result = response.body?.results?.T;
+        const rows = result?.frames?.[0]?.data?.values?.[0]?.length ?? 0;
+        check(!result?.error && rows === expected, `Grafana reads the trace ${sample.traceId} (${sample.label}) from Tempo: ${rows} of ${expected} spans`, result?.error);
+    }
+
+    // Explore shows a link to the trace on each lag.page_view.start event
+    const loki = await getJson(`${args.grafana}/api/datasources/uid/loki`, { headers });
+    const field = loki.body?.jsonData?.derivedFields?.find(f => f.matcherType === "label" && f.matcherRegex === "lag_page_view_trace_id");
+    check(field?.datasourceUid === "tempo", `the Loki datasource has a derived field from lag_page_view_trace_id to Tempo: ${JSON.stringify(field)}`);
+
+    // The Trace column of the page views opens the trace in Tempo
+    const panel = dashboard.panels.find(p => p.title === "Recent page views and lifecycle transitions");
+    const override = panel?.fieldConfig?.overrides?.find(o => o.matcher?.options === "Trace");
+    const link = override?.properties?.find(p => p.id === "links")?.value?.[0];
+    check(panel?.transformations?.some(t => t.id === "filterFieldsByName" && t.options.include.names.includes("lag_page_view_trace_id"))
+        && link?.internal?.datasourceUid === "tempo" && link.internal.query?.query === "${__value.raw}",
+    `the Trace column of "${panel?.title}" has an internal link to Tempo: ${JSON.stringify(link?.internal?.query)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,10 +609,26 @@ function compareCatalog(path) {
     for (const ts of found.filter(f => !METRICS.some(m => m.name === f.name))) {
         check(false, `${ts.name} is in the TypeScript catalog but not in scripts/lib/lag-catalog.mjs`);
     }
+    // Events and spans can have the same name: the spans are in the part from `export const SPANS`.
+    const spansAt = source.indexOf("export const SPANS");
+    const eventSource = spansAt >= 0 ? source.slice(0, spansAt) : source;
+    const spanSource = spansAt >= 0 ? source.slice(spansAt) : "";
+    const attributesOf = (text, name) => {
+        const block = new RegExp(`name\\s*:\\s*"${name.replaceAll(".", "\\.")}"[\\s\\S]*?attributes\\s*:\\s*\\[([\\s\\S]*?)\\]`).exec(text);
+        return block ? [...block[1].matchAll(/"([^"]+)"/g)].map(a => a[1]) : undefined;
+    };
     for (const event of EVENTS) {
-        const block = new RegExp(`name\\s*:\\s*"${event.name.replaceAll(".", "\\.")}"[\\s\\S]*?attributes\\s*:\\s*\\[([\\s\\S]*?)\\]`).exec(source);
-        const attributes = block ? [...block[1].matchAll(/"([^"]+)"/g)].map(a => a[1]) : [];
-        check(block && JSON.stringify(attributes) === JSON.stringify(event.attributes), `event ${event.name}: [${attributes.join(", ")}]`);
+        const attributes = attributesOf(eventSource, event.name);
+        check(attributes && JSON.stringify(attributes) === JSON.stringify(event.attributes), `event ${event.name}: [${(attributes ?? []).join(", ")}]`);
+    }
+    check(spansAt >= 0, "the TypeScript catalog has SPANS");
+    const spanNames = [...spanSource.matchAll(/name\s*:\s*"([^"]+)"/g)].map(m => m[1]);
+    for (const span of SPANS) {
+        const attributes = attributesOf(spanSource, span.name);
+        check(attributes && JSON.stringify(attributes) === JSON.stringify(span.attributes), `span ${span.name}: [${(attributes ?? []).join(", ")}]`);
+    }
+    for (const name of spanNames.filter(n => !SPANS.some(s => s.name === n))) {
+        check(false, `span ${name} is in the TypeScript catalog but not in scripts/lib/lag-catalog.mjs`);
     }
 }
 
@@ -431,6 +640,7 @@ await cors();
 await mimirMetrics();
 await recordingRules();
 await lokiEvents();
+await tempoTraces();
 await grafanaDashboard();
 
 console.log(`\n${failures === 0 ? "All checks passed" : `${failures} checks failed`} (${results.length} checks).`);
