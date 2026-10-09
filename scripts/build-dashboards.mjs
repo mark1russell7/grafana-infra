@@ -207,15 +207,16 @@ const traceLink = (title) => ({
 
 /**
  * A table of recent log lines (events), with the chosen structured-metadata
- * fields as columns. `links` gives the data links of a field, and `widths`
- * the width of its column in pixels.
+ * fields as columns. `links` gives the data links of a field, `widths` the
+ * width of its column in pixels, and `mappings` the value mappings of a field.
  */
-function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = {}, units = {}, links = {}, widths = {} } = {}) {
+function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = {}, units = {}, links = {}, widths = {}, mappings = {} } = {}) {
     const properties = {};
     const add = (name, property) => (properties[rename[name] ?? name] ??= []).push(property);
     for (const [name, unit] of Object.entries(units)) add(name, { id : "unit", value : unit });
     for (const [name, value] of Object.entries(links)) add(name, { id : "links", value });
     for (const [name, value] of Object.entries(widths)) add(name, { id : "custom.width", value });
+    for (const [name, value] of Object.entries(mappings)) add(name, { id : "mappings", value });
     panels.push({
         type : "table",
         title,
@@ -641,8 +642,9 @@ eventTable("Recent page views and lifecycle transitions",
             service_instance_id : "Instance",
         },
         links : { lag_page_view_trace_id : [traceLink("Open the trace of the page view in Tempo")] },
-        // The full trace ID: 32 hexadecimal digits
-        widths : { lag_page_view_trace_id : 290 },
+        // The cell shows "Open trace", not the 32 digits of the ID. The link uses the raw value.
+        mappings : { lag_page_view_trace_id : [{ type : "regex", options : { pattern : "^[0-9a-f]{32}$", result : { text : "Open trace", index : 0 } } }] },
+        widths : { lag_page_view_trace_id : 110 },
     });
 eventTable("Recent hangs and stalls",
     "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",

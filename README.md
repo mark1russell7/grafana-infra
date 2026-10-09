@@ -291,7 +291,7 @@ Loki panels show the events: the page loads and their sessions, recent page view
 
 ### The Trace link
 
-The table "Recent page views and lifecycle transitions" has a Trace column: the `lag_page_view_trace_id` of each `lag.page_view.start` event. A click on a trace ID opens the trace of the page view in Explore, with the Tempo datasource. The link is an internal data link to the datasource `tempo`. Grafana makes the URL of Explore from the trace ID. A lifecycle transition has no trace ID, and a view whose span was not sampled has no trace ID.
+The table "Recent page views and lifecycle transitions" has a Trace column: the `lag_page_view_trace_id` of each `lag.page_view.start` event. The cell shows "Open trace", and the link has the trace ID. A click opens the trace of the page view in Explore, with the Tempo datasource. The link is an internal data link to the datasource `tempo`. Grafana makes the URL of Explore from the trace ID. A lifecycle transition has no trace ID, and a view whose span was not sampled has no trace ID.
 
 The trace shows the view as a timeline: the span of the view, and its hangs, stalls, long animation frames and hidden or frozen periods.
 

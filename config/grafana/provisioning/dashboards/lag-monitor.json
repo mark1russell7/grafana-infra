@@ -5412,7 +5412,22 @@
               },
               {
                 "id": "custom.width",
-                "value": 290
+                "value": 110
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^[0-9a-f]{32}$",
+                      "result": {
+                        "text": "Open trace",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }

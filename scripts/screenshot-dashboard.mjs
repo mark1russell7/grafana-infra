@@ -180,7 +180,8 @@ if (traceView) {
         const panel = await panelInView("Recent page views and lifecycle transitions");
         await panel.screenshot({ path : join(args.out, tableFile) });
         console.log(`Wrote ${join(args.out, tableFile)}`);
-        const link = panel.locator("a", { hasText : traceView.traceId }).first();
+        // The cell shows "Open trace". The URL of the link has the trace ID.
+        const link = panel.locator(`a[href*="${traceView.traceId}"]`).first();
         const href = await link.getAttribute("href", { timeout : 10_000 }).catch(() => null);
         // A click on the link, as a user does. Without the link, the trace opens with an Explore URL.
         await shootTrace(explore(tempoPane(traceView.traceId)), file, undefined, href ? () => link.click() : undefined);
