@@ -250,7 +250,7 @@ async function sendHungPageTrace(profile, durationMs) {
     if (HUNG_PAGE.hangStart - durationMs < 30_000) throw new Error("The journal record of the hung page is not stale at the report");
     const instanceId = randomUUID();
     const provider = createTracerProvider(resourceOf(profile, instanceId), randomUUID());
-    const spans = createSpanSink(provider.getTracer("@lag/core"));
+    const spans = createSpanSink(provider.getTracer("@mark1russell7/lag"));
     const viewId = randomUUID();
     const view = spans.start(S.pageView, {
         startTime : now - HUNG_PAGE.viewStart,
@@ -394,7 +394,7 @@ class Page {
             resource,
             readers : [new PeriodicExportingMetricReader({ exporter, exportIntervalMillis : EXPORT_INTERVAL_MS })],
         });
-        const meter = this.meterProvider.getMeter("@lag/core");
+        const meter = this.meterProvider.getMeter("@mark1russell7/lag");
         this.instruments = {};
         for (const definition of METRICS) {
             const options = { unit : definition.unit };
@@ -408,11 +408,11 @@ class Page {
             // sdk-logs 0.223 takes an options object (0.213 took the exporter as the first argument).
             processors : [new BatchLogRecordProcessor({ exporter : new OTLPLogExporter({ url : `${ENDPOINT}/v1/logs` }), scheduledDelayMillis : 1000 })],
         });
-        this.logger = this.loggerProvider.getLogger("@lag/core");
+        this.logger = this.loggerProvider.getLogger("@mark1russell7/lag");
 
-        // As the setup of the library: createOtelSpanSink(api.trace.getTracer("@lag/core"), api)
+        // As the setup of the library: createOtelSpanSink(api.trace.getTracer("@mark1russell7/lag"), api)
         this.tracerProvider = createTracerProvider(resource, this.sessionId);
-        this.spans = createSpanSink(this.tracerProvider.getTracer("@lag/core"));
+        this.spans = createSpanSink(this.tracerProvider.getTracer("@mark1russell7/lag"));
 
         // The first page view: its span and its lag.page_view.start event need the providers
         this.newView(profile.navigation);
@@ -557,7 +557,7 @@ class Page {
     async postWorkerHangReport(phase, durationMs) {
         const body = encodeOtlpLogs(
             { "service.name" : this.profile.service, "service.version" : this.profile.version, "service.instance.id" : this.workerInstanceId },
-            "@lag/worker",
+            "@mark1russell7/lag/worker",
             [{
                 timeMs : Date.now(),
                 eventName : "lag.main_thread.hang",

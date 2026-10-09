@@ -647,7 +647,7 @@ eventTable("Recent page views and lifecycle transitions",
         widths : { lag_page_view_trace_id : 110 },
     });
 eventTable("Recent hangs and stalls",
-    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
+    "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @mark1russell7/lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
     events('=~"lag.main_thread.hang|lag.stall"'),
     ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "lag_hang_source", "session_id", "service_instance_id"],
     {
