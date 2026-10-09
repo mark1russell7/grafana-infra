@@ -12,6 +12,14 @@
  *   lag.page_view.id and session.id attributes, as otel-ts sends them.
  * - The worker sends hang reports in the exact JSON shape of the library's
  *   encodeOtlpLogs, with fetch(..., { keepalive: true }) and a page Origin.
+ * - The spans go through a TracerProvider with the same resource, as
+ *   createOtelSpanSink sends them: one trace for each page view. The root
+ *   span lag.page_view ends at the first hide of the view. The hangs, the
+ *   stalls, the long animation frames and the hidden and frozen periods are
+ *   spans in it, with their real start and end. The lag.page_view.start
+ *   event has the trace ID and the span ID of the view.
+ * - An abandoned hang is in the trace of the page that hung, with a link to
+ *   the view of the page that reported it.
  *
  * Usage:
  *   node scripts/send-sample-data.mjs [--endpoint http://localhost:4318]
@@ -19,19 +27,22 @@
  *     [--summary sample-summary.json]
  *
  * --duration is the run time in seconds. --interval is the metric export
- * interval in seconds. --summary writes the instance IDs and counts to a
- * file for `scripts/verify-pipeline.mjs --summary`.
+ * interval in seconds. --summary writes the instance IDs, the trace IDs and
+ * the counts to a file for `scripts/verify-pipeline.mjs --summary`.
  */
 
 import { parseArgs } from "node:util";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
+import * as api from "@opentelemetry/api";
 import { AggregationType, InstrumentType, MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { AggregationTemporalityPreference, OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { BasicTracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { M, METRICS, VITAL_THRESHOLDS } from "./lib/lag-catalog.mjs";
+import { M, METRICS, S, VITAL_THRESHOLDS } from "./lib/lag-catalog.mjs";
 
 const { values : args } = parseArgs({
     options : {
@@ -120,6 +131,146 @@ function encodeOtlpLogs(resource, scopeName, records) {
 }
 
 // ---------------------------------------------------------------------------
+// Spans: the form of createOtelSpanSink (lag otel-span-adapter.ts)
+// ---------------------------------------------------------------------------
+
+/** As otel-ts: each span gets session.id when it starts. The resource does not have it. */
+function sessionSpanProcessor(sessionId) {
+    return {
+        onStart(span) {
+            if (span.attributes["session.id"] === undefined) span.setAttribute("session.id", sessionId);
+        },
+        onEnd() {},
+        forceFlush : () => Promise.resolve(),
+        shutdown : () => Promise.resolve(),
+    };
+}
+
+/** As otel-ts: a batch span processor with the default delay, and OTLP/HTTP JSON to /v1/traces. */
+function createTracerProvider(resource, sessionId) {
+    return new BasicTracerProvider({
+        resource,
+        spanProcessors : [
+            sessionSpanProcessor(sessionId),
+            new BatchSpanProcessor(new OTLPTraceExporter({ url : `${ENDPOINT}/v1/traces` })),
+        ],
+    });
+}
+
+/**
+ * The attributes of a span must be in the span catalog. With `complete`, each
+ * attribute that is not optional must also be there.
+ */
+function checkSpanAttributes(definition, attributes, complete = true) {
+    const permitted = (key) => definition.attributes.some(a => a.endsWith("*") ? key.startsWith(a.slice(0, -1)) : a === key);
+    for (const key of Object.keys(attributes)) {
+        if (!permitted(key)) throw new Error(`span ${definition.name}: attribute ${key} is not in the catalog`);
+    }
+    if (!complete) return;
+    for (const key of definition.attributes) {
+        if (!key.endsWith("*") && !(definition.optional ?? []).includes(key) && !(key in attributes)) {
+            throw new Error(`span ${definition.name}: attribute ${key} is missing`);
+        }
+    }
+}
+
+/**
+ * As createOtelSpanSink: each span has the start and the end of its period,
+ * in Unix milliseconds. The parent is the root context, or a remote span
+ * context with the identity of `options.parent`. Thus a span can be in the
+ * trace of another page. A link refers to a span of another trace.
+ */
+function createSpanSink(tracer) {
+    const contextOf = (identity) => ({ traceId : identity.traceId, spanId : identity.spanId, traceFlags : api.TraceFlags.SAMPLED, isRemote : true });
+    const startSpan = (definition, options) => {
+        checkSpanAttributes(definition, options.attributes ?? {});
+        counts.spans[definition.name] = (counts.spans[definition.name] ?? 0) + 1;
+        const parent = options.parent ? api.trace.setSpanContext(api.ROOT_CONTEXT, contextOf(options.parent)) : api.ROOT_CONTEXT;
+        const links = (options.links ?? []).map(identity => ({ context : contextOf(identity) }));
+        return tracer.startSpan(definition.name, {
+            startTime : options.startTime,
+            attributes : options.attributes,
+            ...(links.length > 0 ? { links } : {}),
+        }, parent);
+    };
+    return {
+        /** A span that stays open until `end()`, for example a page view. */
+        start(definition, options) {
+            const span = startSpan(definition, options);
+            const { traceId, spanId } = span.spanContext();
+            let ended = false;
+            return {
+                identity : { traceId, spanId },
+                get ended() { return ended; },
+                setAttributes(attributes) {
+                    if (ended) return;
+                    checkSpanAttributes(definition, attributes, false);
+                    span.setAttributes(attributes);
+                },
+                end(endTime) {
+                    if (ended) return;
+                    ended = true;
+                    span.end(endTime);
+                },
+            };
+        },
+        /** A span that ended already, for example a hang. */
+        record(definition, options) {
+            startSpan(definition, options).end(options.endTime);
+        },
+    };
+}
+
+/** The resource of a page load: the same for the metrics, the logs and the spans. */
+function resourceOf(profile, instanceId) {
+    return resourceFromAttributes({
+        "service.name" : profile.service,
+        "service.version" : profile.version,
+        "service.instance.id" : instanceId,
+        "deployment.environment.name" : "development",
+        "browser.platform" : profile.platform,
+        "browser.mobile" : profile.mobile,
+    });
+}
+
+/** The timeline of the page that hung, in milliseconds before the report of its hang. */
+const HUNG_PAGE = { viewStart : 60_000, hidden : 56_000, visible : 52_000, hangStart : 46_000 };
+
+/**
+ * The trace of a page that hung: an earlier page of the origin. The page ran
+ * before the sample, thus the sample has only its trace, not its metrics or
+ * its events. The span of its view ended when the page became hidden, and
+ * the page sent it then. Later the page hung and closed during the hang.
+ * Its journal record became stale 30 s after the last write of its worker.
+ * The function gives the record of the hang journal: the page ID, the start
+ * of the hang and the identity of the span of the view.
+ */
+async function sendHungPageTrace(profile, durationMs) {
+    const now = Date.now();
+    if (HUNG_PAGE.hangStart - durationMs < 30_000) throw new Error("The journal record of the hung page is not stale at the report");
+    const instanceId = randomUUID();
+    const provider = createTracerProvider(resourceOf(profile, instanceId), randomUUID());
+    const spans = createSpanSink(provider.getTracer("@lag/core"));
+    const viewId = randomUUID();
+    const view = spans.start(S.pageView, {
+        startTime : now - HUNG_PAGE.viewStart,
+        attributes : { "lag.page_view.id" : viewId, navigation_type : "navigate", "lag.page_view.url" : "https://shop.example/products/9" },
+    });
+    view.setAttributes({ "lag.web_vital.ttfb" : 640, "lag.web_vital.fcp" : 1_920, "lag.web_vital.lcp" : 3_100, "lag.web_vital.cls" : 0.04 });
+    view.end(now - HUNG_PAGE.hidden);
+    spans.record(S.hidden, { startTime : now - HUNG_PAGE.hidden, endTime : now - HUNG_PAGE.visible, attributes : { trigger : "visibilitychange" }, parent : view.identity });
+    await provider.shutdown();
+    return {
+        // As createRandomId of the library: 32 hexadecimal digits
+        pageId : randomBytes(16).toString("hex"),
+        instanceId,
+        viewId,
+        viewSpan : view.identity,
+        hangStartedAt : now - HUNG_PAGE.hangStart,
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Pages
 // ---------------------------------------------------------------------------
 
@@ -153,10 +304,11 @@ const ALL_FEATURES = ["loaf", "eventTiming", "memory", "pressure", "liveness", "
  */
 const PROFILES = [
     {
+        // The suspend (92 s to 100 s) is in the view from the back/forward cache, which starts at 90 s.
         service : "lag-sample-shop", version : "1.5.0", platform : "Windows", mobile : false,
         navigation : "navigate", startS : 0, lifeS : Infinity, timerMs : 1.0, resolutionMs : 0.005,
         memorySource : "modern", features : ALL_FEATURES,
-        hidden : [40, 55], bfcache : [80, 90], clockJump : { atS : 100, direction : "forward", kind : "suspend", magnitudeMs : 45_000 },
+        hidden : [40, 55], bfcache : [80, 90], clockJump : { atS : 100, direction : "forward", kind : "suspend", magnitudeMs : 8_000 },
         report : { atS : 12, type : "intervention" },
     },
     {
@@ -195,8 +347,10 @@ const PROFILES = [
     },
 ];
 
-const counts = { metrics : {}, attributeSets : {}, events : {}, appLogs : 0 };
+const counts = { metrics : {}, attributeSets : {}, events : {}, spans : {}, appLogs : 0 };
 const workerReports = [];
+/** The abandoned hangs, each one in the trace of the page that hung. */
+const abandonedHangs = [];
 
 function checkAttributes(definition, attributes) {
     const keys = Object.keys(definition.attributes);
@@ -222,15 +376,10 @@ class Page {
         this.state = "active";
         this.blocked = false;
         this.views = [];
+        /** The span of the hidden or frozen period in which the page is. */
+        this.period = undefined;
 
-        const resource = resourceFromAttributes({
-            "service.name" : profile.service,
-            "service.version" : profile.version,
-            "service.instance.id" : this.instanceId,
-            "deployment.environment.name" : "development",
-            "browser.platform" : profile.platform,
-            "browser.mobile" : profile.mobile,
-        });
+        const resource = resourceOf(profile, this.instanceId);
 
         // As otel-ts with histogramAggregation: "exponential": the exporter's
         // aggregation preference, not a View.
@@ -260,7 +409,12 @@ class Page {
             processors : [new BatchLogRecordProcessor({ exporter : new OTLPLogExporter({ url : `${ENDPOINT}/v1/logs` }), scheduledDelayMillis : 1000 })],
         });
         this.logger = this.loggerProvider.getLogger("@lag/core");
-        // The first page view: its lag.page_view.start event needs the logger
+
+        // As the setup of the library: createOtelSpanSink(api.trace.getTracer("@lag/core"), api)
+        this.tracerProvider = createTracerProvider(resource, this.sessionId);
+        this.spans = createSpanSink(this.tracerProvider.getTracer("@lag/core"));
+
+        // The first page view: its span and its lag.page_view.start event need the providers
         this.newView(profile.navigation);
     }
 
@@ -276,7 +430,10 @@ class Page {
         const host = this.profile.service === "lag-sample-docs" ? "docs.example" : "shop.example";
         const path = navigationType === "soft-navigation" ? "/cart" : `/products/${10 + this.index}`;
         const previous = this.views.length > 0 ? this.view : undefined;
-        this.views.push({
+        const startedAt = Date.now();
+        // As the page-view spans: the span of the previous view ends at the latest at the start of this view
+        if (previous) this.endViewSpan(previous, startedAt);
+        const view = {
             id : randomUUID(),
             navigationType,
             url : `https://${host}${path}`,
@@ -285,13 +442,49 @@ class Page {
             cls : 0,
             reported : false,
             last : {},
+            /** The number of spans in the span of the view, by name. */
+            spans : {},
+        };
+        // One trace for each view: the span of the view is the root
+        view.span = this.spans.start(S.pageView, {
+            startTime : startedAt,
+            attributes : { "lag.page_view.id" : view.id, navigation_type : navigationType, "lag.page_view.url" : view.url },
         });
-        // As the library: one event at the start of each page view
+        this.views.push(view);
+        // As the library: one event at the start of each page view, with the identity of the sampled span of the view
         this.emit("lag.page_view.start", {
             navigation_type : navigationType,
-            "lag.page_view.url" : this.view.url,
+            "lag.page_view.url" : view.url,
             ...(previous ? { "lag.page_view.previous_id" : previous.id } : {}),
-        });
+            "lag.page_view.trace_id" : view.span.identity.traceId,
+            "lag.page_view.span_id" : view.span.identity.spanId,
+        }, startedAt);
+    }
+
+    /**
+     * As the page-view spans: the span of a view ends one time, when the page
+     * is hidden for the first time in the view, or at the end of the view. It
+     * gets the values of the vitals at that time.
+     */
+    endViewSpan(view, time) {
+        if (view.span.ended) return;
+        const values = this.vitalValues(view);
+        view.span.setAttributes(Object.fromEntries(Object.entries(values).map(([name, value]) => [`lag.web_vital.${name}`, value])));
+        view.span.end(time);
+    }
+
+    /**
+     * A span in the span of the current view. The parent is the view, also
+     * after the end of the span of the view. `endTime` records a span that
+     * ended already; without it, the span stays open.
+     */
+    childSpan(definition, startTime, attributes, endTime) {
+        const view = this.view;
+        view.spans[definition.name] = (view.spans[definition.name] ?? 0) + 1;
+        const options = { startTime, attributes, parent : view.span.identity };
+        if (endTime === undefined) return this.spans.start(definition, options);
+        this.spans.record(definition, { ...options, endTime });
+        return undefined;
     }
 
     record(key, value, attributes = {}) {
@@ -335,6 +528,14 @@ class Page {
         this.record("lifecycleTransitions", 1, { from : this.state, to, trigger });
         this.emit("lag.lifecycle.transition", { from : this.state, to, trigger });
         this.state = to;
+        // As the lifecycle factory: a span for each hidden or frozen period, to the next transition
+        const time = Date.now();
+        this.period?.end(time);
+        this.period = undefined;
+        const period = to === "hidden" ? S.hidden : to === "frozen" ? S.frozen : undefined;
+        if (period) this.period = this.childSpan(period, time, { trigger });
+        // As the page-view vitals: the span of the view ends when the page is not visible
+        if (to !== "active" && to !== "passive") this.endViewSpan(this.view, time);
     }
 
     /** One pressure record: the histogram, and an event when the state of the source changes, as the library. */
@@ -349,7 +550,7 @@ class Page {
     }
 
     async flush() {
-        await Promise.allSettled([this.meterProvider.forceFlush(), this.loggerProvider.forceFlush()]);
+        await Promise.allSettled([this.meterProvider.forceFlush(), this.loggerProvider.forceFlush(), this.tracerProvider.forceFlush()]);
     }
 
     /** The worker's own hang report: OTLP/HTTP JSON straight to /v1/logs. */
@@ -453,13 +654,7 @@ class Page {
         if (t === 0) {
             this.log("info", 9, "Lag monitors started", { type : "setupAllMonitors" });
             this.record("clockResolution", p.resolutionMs);
-            if (p.abandonedHang) {
-                // The journal of an earlier page of the origin: that page did not survive its hang.
-                const durationMs = p.abandonedHang.durationMs;
-                this.record("hangs", 1, { outcome : "abandoned" });
-                this.record("hangDuration", durationMs, { outcome : "abandoned" });
-                this.emit("lag.main_thread.hang", { phase : "abandoned", duration_ms : durationMs, "lag.hang.page_id" : randomUUID() });
-            }
+            if (p.abandonedHang) await this.reportAbandonedHang(p.abandonedHang.durationMs);
         }
 
         await this.lifecycleEvents(t);
@@ -544,12 +739,48 @@ class Page {
                 skew_ms : round(uniform(0.5, 3), 0.001), lateness_ms : kind === "suspend" ? magnitudeMs : round(uniform(0, 4), 0.001),
             });
             if (kind === "suspend") {
+                // The episode starts when the system stopped: the event and the span have that time
+                const startedAt = Date.now() - magnitudeMs;
                 this.record("stalls", 1, { kind : "suspend" });
                 this.record("stallDuration", magnitudeMs, { kind : "suspend" });
                 this.record("samplesDiscarded", 1, { reason : "suspend" });
-                this.emit("lag.stall", { kind : "suspend", duration_ms : magnitudeMs });
+                this.emit("lag.stall", { kind : "suspend", duration_ms : magnitudeMs }, startedAt);
+                this.childSpan(S.stall, startedAt, { kind : "suspend", duration_ms : magnitudeMs }, startedAt + magnitudeMs);
             }
         }
+    }
+
+    /**
+     * The journal of an earlier page of the origin: that page did not survive
+     * its hang. As the journal reader of the worker monitor: the event has the
+     * time of the start of the hang. The span of the hang (recordHangSpan) is
+     * in the trace of the page that hung, because the record has the identity
+     * of the span of its view. It has a link to the current view of this page.
+     */
+    async reportAbandonedHang(durationMs) {
+        const hung = await sendHungPageTrace(this.profile, durationMs);
+        const attributes = { phase : "abandoned", duration_ms : durationMs, "lag.hang.page_id" : hung.pageId, "lag.hang.source" : "journal" };
+        this.record("hangs", 1, { outcome : "abandoned" });
+        this.record("hangDuration", durationMs, { outcome : "abandoned" });
+        this.emit("lag.main_thread.hang", attributes, hung.hangStartedAt);
+        this.spans.record(S.hang, {
+            startTime : hung.hangStartedAt,
+            endTime : hung.hangStartedAt + durationMs,
+            attributes,
+            parent : hung.viewSpan,
+            links : [this.view.span.identity],
+        });
+        abandonedHangs.push({
+            pageId : hung.pageId,
+            instanceId : hung.instanceId,
+            viewId : hung.viewId,
+            traceId : hung.viewSpan.traceId,
+            spanId : hung.viewSpan.spanId,
+            durationMs,
+            // The spans in the span of the view of the page that hung
+            spans : { [S.hidden.name] : 1, [S.hang.name] : 1 },
+            reporter : { index : this.index, instanceId : this.instanceId, viewId : this.view.id, ...this.view.span.identity },
+        });
     }
 
     /** A main-thread hang: the page runs nothing; only the worker reports. */
@@ -568,6 +799,9 @@ class Page {
             const startedAt = Date.now() - durationMs;
             this.emit("lag.main_thread.hang", { phase : "ended", duration_ms : durationMs }, startedAt);
             this.emit("lag.stall", { kind : "hang", duration_ms : durationMs }, startedAt);
+            // As recordHangSpan and the stall of the measurement conditions: spans with the real start and end
+            this.childSpan(S.hang, startedAt, { phase : "ended", duration_ms : durationMs }, startedAt + durationMs);
+            this.childSpan(S.stall, startedAt, { kind : "hang", duration_ms : durationMs }, startedAt + durationMs);
         }
     }
 
@@ -607,11 +841,15 @@ class Page {
             this.record("loafBlocking", blocking);
             if (blocking >= 150) {
                 const script = pick(SCRIPTS);
-                this.emit("lag.long_animation_frame", {
+                const attributes = {
                     duration_ms : round(duration, 0.1), blocking_duration_ms : round(blocking, 0.1),
                     "script.invoker" : script.invoker, "script.invoker_type" : script.invokerType,
                     "script.source_url" : script.url, "script.duration_ms" : round(blocking * 0.8 + 40, 0.1),
-                });
+                };
+                // The time of the event and the start of the span is the start of the frame, which ended now
+                const startedAt = Date.now() - duration;
+                this.emit("lag.long_animation_frame", attributes, startedAt);
+                this.childSpan(S.longAnimationFrame, startedAt, attributes, startedAt + duration);
             }
         }
 
@@ -691,7 +929,7 @@ class Page {
         }
         this.transition("terminated", "pagehide");
         // otel-ts shuts the providers down on pagehide: the final export.
-        await Promise.allSettled([this.meterProvider.shutdown(), this.loggerProvider.shutdown()]);
+        await Promise.allSettled([this.meterProvider.shutdown(), this.loggerProvider.shutdown(), this.tracerProvider.shutdown()]);
     }
 }
 
@@ -741,8 +979,10 @@ async function main() {
             instanceId : page.instanceId,
             workerInstanceId : page.workerInstanceId,
             sessionId : page.sessionId,
-            views : page.views.map(v => ({ id : v.id, navigationType : v.navigationType })),
+            // The trace of each view: the identity of its root span, and the number of spans in it by name
+            views : page.views.map(v => ({ id : v.id, navigationType : v.navigationType, ...v.span.identity, spans : v.spans })),
         })),
+        abandonedHangs,
         workerReports,
         metricsWithoutValues : missing,
         counts,
@@ -751,6 +991,7 @@ async function main() {
 
     console.log(`Recorded ${Object.values(counts.metrics).reduce((a, b) => a + b, 0)} measurements in ${used.size} of ${METRICS.length} metrics and ${Object.keys(counts.attributeSets).length} attribute sets.`);
     console.log(`Events: ${JSON.stringify(counts.events)}; app logs: ${counts.appLogs}.`);
+    console.log(`Spans: ${JSON.stringify(counts.spans)}; traces of page views: ${pages.reduce((n, page) => n + page.views.length, 0)}, abandoned hangs in the trace of the hung page: ${abandonedHangs.length}.`);
     for (const report of workerReports) {
         console.log(`Worker hang report (${report.phase}): HTTP ${report.status ?? report.error}, Access-Control-Allow-Origin: ${report.allowOrigin}`);
     }
