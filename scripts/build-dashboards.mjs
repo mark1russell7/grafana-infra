@@ -642,7 +642,7 @@ eventTable("Recent page views and lifecycle transitions",
         },
         links : { lag_page_view_trace_id : [traceLink("Open the trace of the page view in Tempo")] },
         // The full trace ID: 32 hexadecimal digits
-        widths : { lag_page_view_trace_id : 270 },
+        widths : { lag_page_view_trace_id : 290 },
     });
 eventTable("Recent hangs and stalls",
     "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",

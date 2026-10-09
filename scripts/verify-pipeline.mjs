@@ -417,10 +417,11 @@ async function tempoTraces() {
         const span = spans.find(s => s.name === "lag.main_thread.hang");
         const link = span?.links.find(l => l.traceId === hang.reporter.traceId && l.spanId === hang.reporter.spanId);
         const reporterView = summary.pages.find(p => p.index === hang.reporter.index)?.views.find(v => v.id === hang.reporter.viewId);
-        check(span && span.attributes.phase === "abandoned" && span.attributes["lag.hang.page_id"] === hang.pageId
-            && span.resource["service.instance.id"] === hang.reporter.instanceId && link && reporterView?.spanId === hang.reporter.spanId,
-        `the abandoned hang span (phase ${span?.attributes.phase}, source ${span?.attributes["lag.hang.source"]}) is from the reporting page ${hang.reporter.instanceId}, with a link to its view ${hang.reporter.traceId}/${hang.reporter.spanId}`,
-        span ? `links: ${JSON.stringify(span.links)}` : "no lag.main_thread.hang span in the trace");
+        const ok = span && span.attributes.phase === "abandoned" && span.attributes["lag.hang.page_id"] === hang.pageId
+            && span.resource["service.instance.id"] === hang.reporter.instanceId && link && reporterView?.spanId === hang.reporter.spanId;
+        check(ok,
+            `the abandoned hang span (phase ${span?.attributes.phase}, source ${span?.attributes["lag.hang.source"]}) is from the reporting page ${hang.reporter.instanceId}, with a link to its view ${hang.reporter.traceId}/${hang.reporter.spanId}`,
+            ok ? undefined : span ? `links: ${JSON.stringify(span.links)}` : "no lag.main_thread.hang span in the trace");
     }
 
     // The start event of each view has the identity of the span of the view
