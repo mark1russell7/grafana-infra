@@ -89,7 +89,10 @@ export const METRICS = [
 /** Metric key to definition. */
 export const M = Object.fromEntries(METRICS.map(m => [m.key, m]));
 
-/** Every event of the catalog. Every event also has `lag.page_view.id`. */
+/**
+ * Every event of the catalog. Every event also has `lag.page_view.id`.
+ * `optional` lists the attributes that some events of a name do not have.
+ */
 export const EVENTS = [
     {
         name : "browser.web_vital",
@@ -99,7 +102,11 @@ export const EVENTS = [
             "lag.web_vital.*",
         ],
     },
-    { name : "lag.main_thread.hang", attributes : ["phase", "duration_ms", "lag.hang.page_id", "lag.page_view.id"] },
+    {
+        name : "lag.main_thread.hang",
+        attributes : ["phase", "duration_ms", "lag.hang.page_id", "lag.hang.source", "lag.page_view.id"],
+        optional : ["lag.hang.page_id", "lag.hang.source"],
+    },
     { name : "lag.clock.jump", attributes : ["direction", "kind", "magnitude_ms", "skew_ms", "lateness_ms", "lag.page_view.id"] },
     {
         name : "lag.long_animation_frame",
@@ -107,6 +114,17 @@ export const EVENTS = [
     },
     { name : "lag.browser_report", attributes : ["type", "id", "message", "source_file", "line_number", "lag.page_view.id"] },
     { name : "lag.stall", attributes : ["kind", "duration_ms", "lag.page_view.id"] },
+    { name : "lag.lifecycle.transition", attributes : ["from", "to", "trigger", "lag.page_view.id"] },
+    {
+        name : "lag.page_view.start",
+        attributes : ["navigation_type", "lag.page_view.id", "lag.page_view.url", "lag.page_view.previous_id"],
+        optional : ["lag.page_view.url", "lag.page_view.previous_id"],
+    },
+    {
+        name : "lag.pressure.change",
+        attributes : ["source", "state", "previous_state", "lag.page_view.id"],
+        optional : ["previous_state"],
+    },
 ];
 
 /** Good and poor thresholds of the vitals. A value at or below `good` is good; a value above `poor` is poor. */

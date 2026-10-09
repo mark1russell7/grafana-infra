@@ -13,7 +13,8 @@
  *    catalog event, the event attributes as structured metadata, and the
  *    worker's own JSON hang report.
  * 6. Grafana loads the Lag Monitor dashboard, and every query of every
- *    panel returns data through the Grafana datasource API.
+ *    panel and every annotation layer returns data through the Grafana
+ *    datasource API.
  *
  * Usage:
  *   node scripts/verify-pipeline.mjs [--summary sample-summary.json]
@@ -223,15 +224,25 @@ async function lokiEvents() {
     }
 
     // No event is lost: Loki drops an entry with the same timestamp and line as the previous one.
+    // The last records of the sample (the final vitals and transitions of each page at its close) can
+    // still be in the batch of Alloy when this check starts. Thus it waits up to 30 s for them.
     if (summary) {
         const rangeS = Math.ceil((toMs - fromMs) / 1000);
-        for (const event of EVENTS) {
-            const sent = summary.counts.events[event.name] ?? 0;
+        const storedCount = async (name) => {
             const result = await lokiGet("/loki/api/v1/query", {
-                query : `sum(count_over_time({service_name=~"${serviceRegex}", event_name="${event.name}"}[${rangeS}s]))`,
+                query : `sum(count_over_time({service_name=~"${serviceRegex}", event_name="${name}"}[${rangeS}s]))`,
                 time : String(toMs / 1000),
             });
-            const stored = Number(result.data?.result?.[0]?.value?.[1] ?? 0);
+            return Number(result.data?.result?.[0]?.value?.[1] ?? 0);
+        };
+        const deadline = Date.now() + 30_000;
+        for (const event of EVENTS) {
+            const sent = summary.counts.events[event.name] ?? 0;
+            let stored = await storedCount(event.name);
+            while (stored < sent && Date.now() < deadline) {
+                await new Promise(resolve => setTimeout(resolve, 2_000));
+                stored = await storedCount(event.name);
+            }
             check(stored === sent, `${event.name}: Loki has ${stored} of the ${sent} events that the sample sent`);
         }
     }
@@ -244,7 +255,7 @@ async function lokiEvents() {
         const entry = result.data?.result?.[0]?.values?.[0];
         const metadata = entry?.[2]?.structuredMetadata ?? {};
         const expected = event.attributes
-            .filter(a => !a.endsWith("*") && !(event.name === "lag.main_thread.hang" && a === "lag.hang.page_id"))
+            .filter(a => !a.endsWith("*") && !(event.optional ?? []).includes(a))
             .map(a => a.replaceAll(".", "_"));
         const missing = ["service_instance_id", "lag_page_view_id", ...expected].filter(k => !(k in metadata));
         check(entry && missing.length === 0, `${event.name}: structured metadata has the event attributes and service_instance_id`,
@@ -280,7 +291,9 @@ async function lokiEvents() {
 function substitute(expr) {
     return expr
         .replaceAll("$service_name", serviceRegex)
-        .replaceAll("$navigation_type", ".+");
+        .replaceAll("$navigation_type", ".+")
+        .replaceAll("$instance", ".+")
+        .replaceAll("${session_id:regex}", "");
 }
 
 function frameHasData(frame) {
@@ -349,6 +362,21 @@ async function grafanaDashboard() {
     }
     const good = rows.filter(r => r.ok).length;
     info(`${good} of ${rows.length} panel queries returned data`);
+
+    // Each annotation layer finds events, and each event line has the fields of its templates
+    for (const layer of dashboard.annotations.list.filter(a => !a.builtIn)) {
+        const query = { refId : "Anno", datasource : layer.datasource, expr : substitute(layer.target.expr), queryType : "range", maxLines : 100 };
+        const response = await getJson(`${args.grafana}/api/ds/query`, {
+            method : "POST",
+            headers,
+            body : JSON.stringify({ queries : [query], from : String(fromMs), to : String(toMs) }),
+        });
+        const result = response.body?.results?.Anno;
+        const frames = result?.frames ?? [];
+        const withData = frames.filter(frameHasData).length;
+        check(!result?.error && withData > 0, `annotation "${layer.name}": ${result?.error ? `ERROR ${result.error}` : `${withData} of ${frames.length} frames with data`}`,
+            args.verbose ? query.expr : undefined);
+    }
 }
 
 // ---------------------------------------------------------------------------

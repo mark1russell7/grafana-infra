@@ -214,10 +214,29 @@ pnpm dashboards
 
 Grafana reads the file again in 30 seconds or less.
 
-The dashboard has two variables:
+The dashboard has these variables:
 
 - Service: the `service_name` label.
+- Page load: one SDK instance, the `instance` label (`service.instance.id`). With one page load, each panel and each annotation layer shows only that page. The long-range row uses recording rules that sum all page loads, thus this variable does not apply there.
+- Session: the start of a `session.id`. The Page loads table shows the page loads of the matching sessions. A click on a page load sets the Page load variable.
 - Navigation type: the `navigation_type` label of the Web Vitals metrics.
+
+### Annotation layers
+
+Each kind of lag event is an annotation layer, with its own switch at the top of the dashboard. A layer shows a mark on each time series panel at the time of each event. The lag library gives each event the time of its occurrence (for an event with a duration, the start). Thus a mark is at the time of the metric values that it explains.
+
+| Layer | Event | On by default |
+|---|---|---|
+| Hangs | `lag.main_thread.hang` | yes |
+| Stalls | `lag.stall` | yes |
+| Page views | `lag.page_view.start` | no |
+| Lifecycle | `lag.lifecycle.transition` | no |
+| Compute pressure | `lag.pressure.change` | no |
+| Clock jumps | `lag.clock.jump` | no |
+| Long animation frames | `lag.long_animation_frame` | no |
+| Browser reports | `lag.browser_report` | no |
+
+The layers with many events are off by default. With all page loads, the marks of all pages are on the panels. Select one page load first, then turn on the layers. Each layer follows the Service and Page load variables. Its query parses the line of the event with `logfmt`, thus the title and the text of a mark can use each attribute.
 
 The dashboard has one row for each monitor family:
 
@@ -234,14 +253,14 @@ The dashboard has one row for each monitor family:
 - GC, page lifecycle and timer throttling
 - browser reports and shared-memory liveness
 
-Loki panels show the events: recent hangs and stalls, clock jumps, browser reports, LoAF attribution and Web Vitals values. The last row uses the recording rules.
+Loki panels show the events: the page loads and their sessions, recent page views and lifecycle transitions, recent hangs and stalls, clock jumps, browser reports, LoAF attribution and Web Vitals values. The last row uses the recording rules.
 
 The queries obey these rules:
 
 - A histogram query first sums the rates of all page loads, then takes the quantile.
 - An example is `histogram_quantile(0.95, sum(rate(x[$__rate_interval])))`.
 - A counter query uses `rate()`.
-- No query groups by `instance` or by session.
+- No query groups by `instance` or by session. A query can filter by one `instance` (the Page load variable).
 
 The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$__rate_interval` is 60 seconds or more.
 
@@ -276,7 +295,11 @@ The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$_
 - The `instance` label is the `service.instance.id`. No series has a `session_id` label.
 - The recording rules are healthy and have data.
 - Loki has only the index labels `service_name` and `event_name`, and it has all the lag events.
-- Grafana loads the dashboard, and each panel query gives data.
+- Grafana loads the dashboard, and each panel query and each annotation layer gives data.
+
+`scripts/screenshot-dashboard.mjs` takes screenshots of the dashboard after the sample data: `fleet.png` for all page loads, and `page-<index>.png` for one page load with every annotation layer on.
+
+The CI workflow `.github/workflows/verify.yml` does all of this on each pull request: it starts the stack, sends the sample data, verifies the pipeline and uploads the screenshots as the artifact `dashboard-screenshots`.
 
 If Grafana uses a different port, add `--grafana http://localhost:3300`. To compare `scripts/lib/lag-catalog.mjs` with the lag catalog, add `--catalog ../lag/packages/lag/src/metric-catalog.ts`.
 

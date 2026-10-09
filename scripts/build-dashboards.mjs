@@ -23,13 +23,23 @@ const MIMIR = { type : "prometheus", uid : "mimir" };
 const LOKI = { type : "loki", uid : "loki" };
 const SERVICE = 'service_name=~"$service_name"';
 const NAV = 'navigation_type=~"$navigation_type"';
+/** One page load (one SDK instance), or all of them. Mimir makes the instance label from service.instance.id. */
+const INSTANCE = 'instance=~"$instance"';
+
+/**
+ * The lag events of the selected services and page loads, with the event
+ * name matcher `name` (for example `="lag.stall"`). In Loki, the resource
+ * attribute service.instance.id is the structured metadata
+ * service_instance_id.
+ */
+const events = (name) => `{service_name=~"$service_name", event_name${name}} | service_instance_id=~"$instance"`;
 
 // ---------------------------------------------------------------------------
 // PromQL helpers
 // ---------------------------------------------------------------------------
 
 function selector(metric, ...matchers) {
-    return `${metric}{${[SERVICE, ...matchers].join(", ")}}`;
+    return `${metric}{${[SERVICE, INSTANCE, ...matchers].join(", ")}}`;
 }
 
 /** The rate of a native histogram, summed: one histogram for the fleet (or for each `by` group). */
@@ -205,6 +215,90 @@ function eventTable(title, description, expr, fields, { w = 24, h = 9, rename = 
     });
 }
 
+/**
+ * A table of the page loads (service_instance_id) with lag events, and of
+ * their sessions. A click on a page load sets the variable $instance.
+ */
+function pageLoadTable(title, description) {
+    const expr = `topk(50, sum by (service_instance_id, session_id) (count_over_time(${events('=~".+"')} | session_id=~"\${session_id:regex}.*" [$__range])))`;
+    panels.push({
+        type : "table",
+        title,
+        description,
+        datasource : LOKI,
+        w : 24, h : 8,
+        fieldConfig : {
+            defaults : { custom : { align : "auto", cellOptions : { type : "auto" } } },
+            overrides : [{
+                matcher : { id : "byName", options : "Page load" },
+                properties : [{
+                    id : "links",
+                    value : [{
+                        title : "Show only this page load",
+                        url : "/d/lag-monitor/lag-monitor?var-instance=${__value.raw}&var-service_name=${service_name}&${__url_time_range}",
+                    }],
+                }],
+            }],
+        },
+        options : { showHeader : true, cellHeight : "sm", sortBy : [{ displayName : "Events", desc : true }] },
+        targets : [lokiInstant(expr, "")],
+        // As metricTable: one column for each label, then one row for each series. The value field of one
+        // instant query is "Value" or "Value #A", by the version of Grafana.
+        transformations : [
+            { id : "labelsToFields", options : { mode : "columns" } },
+            { id : "merge", options : {} },
+            {
+                id : "organize",
+                options : {
+                    excludeByName : { Time : true },
+                    indexByName : { service_instance_id : 0, session_id : 1, Value : 2, "Value #A" : 2 },
+                    renameByName : { service_instance_id : "Page load", session_id : "Session", Value : "Events", "Value #A" : "Events" },
+                },
+            },
+        ],
+    });
+}
+
+/**
+ * The annotation layers: one for each kind of event. The dashboard has a
+ * switch for each one. Each layer follows $service_name and $instance. The
+ * time of an event is its occurrence (the start, for an event with a
+ * duration), thus a mark is at the time of the metric values that it explains.
+ * The layers with many events are off by default: turn them on for one page
+ * load.
+ */
+function annotation(name, eventName, { color, enable = false, title, text, tags }) {
+    // logfmt parses the line of the event (name key=value ...), thus the templates can use each attribute
+    const expr = `${events(`="${eventName}"`)} | logfmt`;
+    return {
+        name,
+        datasource : LOKI,
+        enable,
+        hide : false,
+        iconColor : color,
+        // The Loki datasource of Grafana 13 reads the query and the formats from the annotation itself
+        // (annotationQuery). The target has the same query, for the editor and for verify-pipeline.
+        expr,
+        instant : false,
+        maxLines : 500,
+        target : { refId : "Anno", expr, queryType : "range" },
+        titleFormat : title,
+        textFormat : text,
+        tagKeys : tags,
+    };
+}
+
+const ANNOTATIONS = [
+    annotation("Hangs", "lag.main_thread.hang", { color : "red", enable : true, title : "Hang {{phase}}", text : "{{duration_ms}} ms, source {{lag_hang_source}}", tags : "phase,lag_hang_source" }),
+    annotation("Stalls", "lag.stall", { color : "orange", enable : true, title : "Stall: {{kind}}", text : "{{duration_ms}} ms", tags : "kind" }),
+    annotation("Page views", "lag.page_view.start", { color : "blue", title : "Page view: {{navigation_type}}", text : "{{lag_page_view_url}}", tags : "navigation_type" }),
+    annotation("Lifecycle", "lag.lifecycle.transition", { color : "purple", title : "{{from}} to {{to}}", text : "{{trigger}}", tags : "trigger" }),
+    annotation("Compute pressure", "lag.pressure.change", { color : "yellow", title : "Pressure {{source}}: {{state}}", text : "from {{previous_state}}", tags : "source,state" }),
+    annotation("Clock jumps", "lag.clock.jump", { color : "#8f8f8f", title : "Clock {{kind}} {{direction}}", text : "{{magnitude_ms}} ms", tags : "kind" }),
+    annotation("Long animation frames", "lag.long_animation_frame", { color : "#b877d9", title : "Long animation frame", text : "{{blocking_duration_ms}} ms blocking, {{script_invoker}}", tags : "script_invoker_type" }),
+    annotation("Browser reports", "lag.browser_report", { color : "#5794f2", title : "{{type}}: {{id}}", text : "{{message}}", tags : "type" }),
+];
+
 // ---------------------------------------------------------------------------
 // Panels
 // ---------------------------------------------------------------------------
@@ -326,7 +420,7 @@ timeseries("LoAF duration p50 / p95 / p99",
 timeseries("Long animation frames per minute",
     "Long animation frames of all page loads, each minute.",
     [prom(observationsPerMinute("lag_loaf_duration_histogram"), "frames/min")], { unit : "none", w : 8 });
-const loafEvents = '{service_name=~"$service_name", event_name="lag.long_animation_frame"}';
+const loafEvents = events('="lag.long_animation_frame"');
 const scriptLabels = "script_invoker_type, script_invoker, script_source_url";
 metricTable("LoAF attribution: blocking time by script (events)",
     "From the lag.long_animation_frame events (frames that block 150 ms or more). The script is the script that blocked the frame most.",
@@ -393,7 +487,7 @@ for (const [name, label, metric, long] of vitals) {
         [prom(quantile(0.75, metric, { by : "navigation_type", matchers : [NAV] }), "{{navigation_type}}")],
         { unit : name === "cls" ? "none" : "ms", decimals : name === "cls" ? 3 : undefined, thresholds : vitalThresholds(name), w : name === "inp" || name === "cls" ? 12 : 8 });
 }
-const vitalEvents = '{service_name=~"$service_name", event_name="browser.web_vital"} | browser_web_vital_navigation_type=~"$navigation_type"';
+const vitalEvents = `${events('="browser.web_vital"')} | browser_web_vital_navigation_type=~"$navigation_type"`;
 metricTable("Web Vitals p75 from events, by navigation type",
     "From the browser.web_vital events (LogQL unwrap of browser_web_vital_value). A page view sends a new event at each change of a vital, so this p75 includes the earlier values too.",
     [
@@ -472,7 +566,7 @@ timeseries("Browser reports per minute, by type",
 eventTable("Recent browser reports (events)",
     "The latest lag.browser_report events.",
     // A Grafana log frame has its own "id" field, so the report id becomes report_id.
-    '{service_name=~"$service_name", event_name="lag.browser_report"} | label_format report_id=id',
+    `${events('="lag.browser_report"')} | label_format report_id=id`,
     ["service_name", "type", "report_id", "message", "source_file", "line_number"],
     { w : 12, h : 8, rename : { service_name : "Service", type : "Type", report_id : "ID", message : "Message", source_file : "Source file", line_number : "Line" } });
 
@@ -487,10 +581,23 @@ timeseries("Liveness blocks per minute",
 row("Events (Loki)");
 timeseries("Events per minute, by event name",
     "Lag events in Loki in the minute before each point. event_name is an index label.",
-    [loki('sum by (event_name) (count_over_time({service_name=~"$service_name", event_name=~".+"} [1m]))', "{{event_name}}")], { unit : "none", w : 24, h : 7, interval : "15s" });
+    [loki(`sum by (event_name) (count_over_time(${events('=~".+"')} [1m]))`, "{{event_name}}")], { unit : "none", w : 24, h : 7, interval : "15s" });
+pageLoadTable("Page loads",
+    "The page loads (SDK instances) with lag events in the time range, with the number of events. Set Session to see the page loads of one session. A click on a page load sets the Page load variable: then each panel and each annotation shows only that page load.");
+eventTable("Recent page views and lifecycle transitions",
+    "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts.",
+    events('=~"lag.page_view.start|lag.lifecycle.transition"'),
+    ["event_name", "navigation_type", "from", "to", "trigger", "lag_page_view_url", "lag_page_view_id", "lag_page_view_previous_id", "session_id", "service_instance_id"],
+    {
+        h : 9,
+        rename : {
+            event_name : "Event", navigation_type : "Navigation", from : "From", to : "To", trigger : "Trigger", lag_page_view_url : "URL",
+            lag_page_view_id : "Page view", lag_page_view_previous_id : "Previous view", session_id : "Session", service_instance_id : "Instance",
+        },
+    });
 eventTable("Recent hangs and stalls",
     "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (lag.hang.source journal), another open page (peer), or the page itself at its close (self).",
-    '{service_name=~"$service_name", event_name=~"lag.main_thread.hang|lag.stall"}',
+    events('=~"lag.main_thread.hang|lag.stall"'),
     ["service_name", "event_name", "phase", "kind", "duration_ms", "scope_name", "lag_page_view_id", "lag_hang_page_id", "session_id", "service_instance_id"],
     {
         h : 10,
@@ -502,7 +609,7 @@ eventTable("Recent hangs and stalls",
     });
 eventTable("Recent clock jumps",
     "The latest lag.clock.jump events, with the size of the jump.",
-    '{service_name=~"$service_name", event_name="lag.clock.jump"}',
+    events('="lag.clock.jump"'),
     ["service_name", "kind", "direction", "magnitude_ms", "skew_ms", "lateness_ms", "lag_page_view_id", "session_id"],
     {
         h : 7,
@@ -510,7 +617,7 @@ eventTable("Recent clock jumps",
         units : { magnitude_ms : "ms", skew_ms : "ms", lateness_ms : "ms" },
     });
 
-row("Long range (recording rules)");
+row("Long range (recording rules, all page loads)");
 const recorded = [
     ["lag_drift_histogram", "drift"],
     ["lag_macrotask_histogram", "macrotask"],
@@ -520,7 +627,7 @@ const recorded = [
     ["lag_frame_delta_histogram", "frame delta"],
 ];
 timeseries("p95 by service (recorded)",
-    "From the recording rules service_name:<metric>:p95_rate5m (5-minute windows, evaluated each minute). Use these panels for long time ranges.",
+    "From the recording rules service_name:<metric>:p95_rate5m (5-minute windows, evaluated each minute). Use these panels for long time ranges. The rules sum all page loads, thus the Page load variable does not apply here.",
     recorded.map(([metric, label]) => prom(`service_name:${metric}:p95_rate5m{${SERVICE}}`, `{{service_name}} ${label}`)), { legend : "table" });
 timeseries("p99 by service (recorded)",
     "From the recording rules service_name:<metric>:p99_rate5m.",
@@ -588,7 +695,7 @@ const dashboard = {
             iconColor : "rgba(0, 211, 255, 1)",
             name : "Annotations & Alerts",
             type : "dashboard",
-        }],
+        }, ...ANNOTATIONS],
     },
     templating : {
         list : [
@@ -608,6 +715,33 @@ const dashboard = {
                 sort : 1,
                 regex : "",
                 options : [],
+                hide : 0,
+            },
+            {
+                name : "instance",
+                label : "Page load",
+                description : "One page load: one SDK instance (service.instance.id, the instance label of Mimir). With one page load, each panel and each annotation shows only that page. The Page loads table sets it.",
+                type : "query",
+                datasource : MIMIR,
+                definition : 'label_values(lag_drift_histogram{service_name=~"$service_name"}, instance)',
+                query : { qryType : 1, query : 'label_values(lag_drift_histogram{service_name=~"$service_name"}, instance)', refId : "PrometheusVariableQueryEditor-VariableQuery" },
+                refresh : 2,
+                includeAll : true,
+                multi : false,
+                allValue : ".+",
+                current : { selected : true, text : ["All"], value : ["$__all"] },
+                sort : 1,
+                regex : "",
+                options : [],
+                hide : 0,
+            },
+            {
+                name : "session_id",
+                label : "Session",
+                description : "The start of a session.id. The Page loads table shows the page loads of the matching sessions.",
+                type : "textbox",
+                query : "",
+                current : { text : "", value : "" },
                 hide : 0,
             },
             {

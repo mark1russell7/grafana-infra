@@ -131,6 +131,20 @@ const SCRIPTS = [
     { invoker : "BUTTON#buy.onclick", invokerType : "event-listener", url : "https://shop.example/assets/checkout.js" },
 ];
 
+const PRESSURE_STATES = ["nominal", "fair", "serious", "critical"];
+
+/**
+ * The line of an event, as formatEventLine of the lag library: the name, and
+ * the attributes as sorted key=value pairs. A value goes into JSON quotes when
+ * it is empty or has a space, a quote or "=".
+ */
+function formatEventLine(name, attributes) {
+    const value = (v) => {
+        const text = String(v);
+        return text === "" || /[\s="]/.test(text) ? JSON.stringify(text) : text;
+    };
+    return [name, ...Object.keys(attributes).sort().map(key => `${key}=${value(attributes[key])}`)].join(" ");
+}
 const ALL_FEATURES = ["loaf", "eventTiming", "memory", "pressure", "liveness", "idle"];
 
 /**
@@ -208,7 +222,6 @@ class Page {
         this.state = "active";
         this.blocked = false;
         this.views = [];
-        this.newView(profile.navigation);
 
         const resource = resourceFromAttributes({
             "service.name" : profile.service,
@@ -247,6 +260,8 @@ class Page {
             processors : [new BatchLogRecordProcessor({ exporter : new OTLPLogExporter({ url : `${ENDPOINT}/v1/logs` }), scheduledDelayMillis : 1000 })],
         });
         this.logger = this.loggerProvider.getLogger("@lag/core");
+        // The first page view: its lag.page_view.start event needs the logger
+        this.newView(profile.navigation);
     }
 
     has(feature) {
@@ -260,6 +275,7 @@ class Page {
     newView(navigationType) {
         const host = this.profile.service === "lag-sample-docs" ? "docs.example" : "shop.example";
         const path = navigationType === "soft-navigation" ? "/cart" : `/products/${10 + this.index}`;
+        const previous = this.views.length > 0 ? this.view : undefined;
         this.views.push({
             id : randomUUID(),
             navigationType,
@@ -269,6 +285,12 @@ class Page {
             cls : 0,
             reported : false,
             last : {},
+        });
+        // As the library: one event at the start of each page view
+        this.emit("lag.page_view.start", {
+            navigation_type : navigationType,
+            "lag.page_view.url" : this.view.url,
+            ...(previous ? { "lag.page_view.previous_id" : previous.id } : {}),
         });
     }
 
@@ -282,13 +304,23 @@ class Page {
         counts.attributeSets[set] = (counts.attributeSets[set] ?? 0) + 1;
     }
 
-    /** As createOtelEventSink: eventName, severity INFO, no body. */
-    emit(name, attributes) {
+    /**
+     * As createOtelEventSink: eventName, severity INFO, the line of the event
+     * as the body, and the time of the occurrence as the time of the record
+     * (`timeMs`, the start of an event with a duration). Without it, the
+     * record gets the time of the call. The body makes the lines of one
+     * millisecond different: Loki drops an entry with the time and the line
+     * of the previous entry of its stream.
+     */
+    emit(name, attributes, timeMs) {
+        const all = { ...attributes, "lag.page_view.id" : this.view.id, "session.id" : this.sessionId };
         this.logger.emit({
             eventName : name,
             severityText : "INFO",
             severityNumber : 9,
-            attributes : { ...attributes, "lag.page_view.id" : this.view.id, "session.id" : this.sessionId },
+            body : formatEventLine(name, all),
+            attributes : all,
+            ...(timeMs === undefined ? {} : { timestamp : timeMs }),
         });
         counts.events[name] = (counts.events[name] ?? 0) + 1;
     }
@@ -301,7 +333,19 @@ class Page {
 
     transition(to, trigger) {
         this.record("lifecycleTransitions", 1, { from : this.state, to, trigger });
+        this.emit("lag.lifecycle.transition", { from : this.state, to, trigger });
         this.state = to;
+    }
+
+    /** One pressure record: the histogram, and an event when the state of the source changes, as the library. */
+    pressure(source, ordinal) {
+        this.record("pressureState", ordinal, { source });
+        const state = PRESSURE_STATES[ordinal];
+        this.pressureStates ??= {};
+        const previous = this.pressureStates[source];
+        if (previous === state) return;
+        this.pressureStates[source] = state;
+        this.emit("lag.pressure.change", { source, state, ...(previous ? { previous_state : previous } : {}) });
     }
 
     async flush() {
@@ -520,8 +564,10 @@ class Page {
             this.record("hangDuration", durationMs, { outcome : "ended" });
             this.record("stalls", 1, { kind : "hang" });
             this.record("stallDuration", durationMs, { kind : "hang" });
-            this.emit("lag.main_thread.hang", { phase : "ended", duration_ms : durationMs });
-            this.emit("lag.stall", { kind : "hang", duration_ms : durationMs });
+            // The time of each event is the start of the hang
+            const startedAt = Date.now() - durationMs;
+            this.emit("lag.main_thread.hang", { phase : "ended", duration_ms : durationMs }, startedAt);
+            this.emit("lag.stall", { kind : "hang", duration_ms : durationMs }, startedAt);
         }
     }
 
@@ -628,8 +674,8 @@ class Page {
         // ComputePressureMonitor: every 5 s.
         if (this.has("pressure") && t % 5 === 0) {
             const r = rnd();
-            this.record("pressureState", r < 0.7 ? 0 : r < 0.9 ? 1 : r < 0.98 ? 2 : 3, { source : "cpu" });
-            if (p.thermals) this.record("pressureState", rnd() < 0.8 ? 0 : 1 + Math.floor(rnd() * 2), { source : "thermals" });
+            this.pressure("cpu", r < 0.7 ? 0 : r < 0.9 ? 1 : r < 0.98 ? 2 : 3);
+            if (p.thermals) this.pressure("thermals", rnd() < 0.8 ? 0 : 1 + Math.floor(rnd() * 2));
         }
 
         // TimerThrottleDetector: every 10 s. Hidden tabs get throttled timers.

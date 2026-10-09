@@ -1,0 +1,67 @@
+name: Verify
+
+# The stack end to end: start it, send sample telemetry in the form of the
+# lag library, check every metric, event, panel query and annotation layer,
+# and take screenshots of the dashboard for review.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Stack, sample data and dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The version comes from packageManager in package.json
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The dashboard file agrees with scripts/build-dashboards.mjs
+        run: |
+          node scripts/build-dashboards.mjs
+          git diff --exit-code config/grafana/provisioning/dashboards/
+      - name: Start the stack
+        run: docker compose up -d
+      - name: Wait for Alloy, Mimir, Loki and Grafana
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:12345/-/ready && curl -fsS http://localhost:9009/ready \
+              && curl -fsS http://localhost:3100/ready && curl -fsS http://localhost:3000/api/health; then exit 0; fi
+            sleep 5
+          done
+          echo "The stack did not become ready in 5 minutes" >&2
+          exit 1
+      - name: Send sample data
+        run: node scripts/send-sample-data.mjs --summary sample-summary.json
+      - name: Verify the pipeline and the dashboard
+        run: node scripts/verify-pipeline.mjs --summary sample-summary.json
+      - name: Install Chromium for the screenshots
+        if: always()
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Screenshots of the dashboard
+        if: always()
+        run: node scripts/screenshot-dashboard.mjs --summary sample-summary.json --out screenshots
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+      - name: Logs of the stack
+        if: failure()
+        run: docker compose logs --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v

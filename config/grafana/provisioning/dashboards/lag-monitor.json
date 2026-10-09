@@ -35,6 +35,174 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "name": "Hangs",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "red",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.main_thread.hang\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.main_thread.hang\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Hang {{phase}}",
+        "textFormat": "{{duration_ms}} ms, source {{lag_hang_source}}",
+        "tagKeys": "phase,lag_hang_source"
+      },
+      {
+        "name": "Stalls",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "orange",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.stall\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.stall\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Stall: {{kind}}",
+        "textFormat": "{{duration_ms}} ms",
+        "tagKeys": "kind"
+      },
+      {
+        "name": "Page views",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "blue",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.page_view.start\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.page_view.start\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Page view: {{navigation_type}}",
+        "textFormat": "{{lag_page_view_url}}",
+        "tagKeys": "navigation_type"
+      },
+      {
+        "name": "Lifecycle",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "purple",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.lifecycle.transition\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.lifecycle.transition\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "{{from}} to {{to}}",
+        "textFormat": "{{trigger}}",
+        "tagKeys": "trigger"
+      },
+      {
+        "name": "Compute pressure",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "yellow",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.pressure.change\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.pressure.change\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Pressure {{source}}: {{state}}",
+        "textFormat": "from {{previous_state}}",
+        "tagKeys": "source,state"
+      },
+      {
+        "name": "Clock jumps",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "#8f8f8f",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Clock {{kind}} {{direction}}",
+        "textFormat": "{{magnitude_ms}} ms",
+        "tagKeys": "kind"
+      },
+      {
+        "name": "Long animation frames",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "#b877d9",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Long animation frame",
+        "textFormat": "{{blocking_duration_ms}} ms blocking, {{script_invoker}}",
+        "tagKeys": "script_invoker_type"
+      },
+      {
+        "name": "Browser reports",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "#5794f2",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "{{type}}: {{id}}",
+        "textFormat": "{{message}}",
+        "tagKeys": "type"
       }
     ]
   },
@@ -71,6 +239,51 @@
         "sort": 1,
         "regex": "",
         "options": [],
+        "hide": 0
+      },
+      {
+        "name": "instance",
+        "label": "Page load",
+        "description": "One page load: one SDK instance (service.instance.id, the instance label of Mimir). With one page load, each panel and each annotation shows only that page. The Page loads table sets it.",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "definition": "label_values(lag_drift_histogram{service_name=~\"$service_name\"}, instance)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(lag_drift_histogram{service_name=~\"$service_name\"}, instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "regex": "",
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "session_id",
+        "label": "Session",
+        "description": "The start of a session.id. The Page loads table shows the page loads of the matching sessions.",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
         "hide": 0
       },
       {
@@ -171,7 +384,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "count(count_over_time(lag_drift_histogram{service_name=~\"$service_name\"}[1m])) or vector(0)",
+          "expr": "count(count_over_time(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[1m])) or vector(0)",
           "legendFormat": "page loads",
           "range": true,
           "instant": false
@@ -233,7 +446,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -295,7 +508,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -365,7 +578,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum(increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum(increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "INP p75",
           "range": false,
           "instant": true
@@ -428,7 +641,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(increase(lag_main_thread_hangs{service_name=~\"$service_name\"}[$__range]))",
+          "expr": "sum(increase(lag_main_thread_hangs{service_name=~\"$service_name\", instance=~\"$instance\"}[$__range]))",
           "legendFormat": "hangs",
           "range": false,
           "instant": true
@@ -491,7 +704,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(increase(lag_stalls{service_name=~\"$service_name\"}[$__range]))",
+          "expr": "sum(increase(lag_stalls{service_name=~\"$service_name\", instance=~\"$instance\"}[$__range]))",
           "legendFormat": "stalls",
           "range": false,
           "instant": true
@@ -565,7 +778,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -576,7 +789,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -587,7 +800,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -598,7 +811,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_avg(sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_avg(sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "mean",
           "range": true,
           "instant": false
@@ -659,7 +872,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -670,7 +883,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_drift_baseline_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -731,7 +944,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_count(sum (rate(lag_drift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_count(sum (rate(lag_drift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "windows/s",
           "range": true,
           "instant": false
@@ -805,7 +1018,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -816,7 +1029,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -827,7 +1040,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -838,7 +1051,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_avg(sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_avg(sum (rate(lag_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "mean",
           "range": true,
           "instant": false
@@ -912,7 +1125,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "microtask",
           "range": true,
           "instant": false
@@ -923,7 +1136,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "macrotask (setTimeout 0)",
           "range": true,
           "instant": false
@@ -934,7 +1147,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "MessageChannel",
           "range": true,
           "instant": false
@@ -995,7 +1208,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_microtask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "microtask",
           "range": true,
           "instant": false
@@ -1006,7 +1219,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_macrotask_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "macrotask (setTimeout 0)",
           "range": true,
           "instant": false
@@ -1017,7 +1230,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_scheduling_message_channel_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "MessageChannel",
           "range": true,
           "instant": false
@@ -1091,7 +1304,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -1102,7 +1315,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -1113,7 +1326,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -1124,7 +1337,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_avg(sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_avg(sum (rate(lag_worker_main_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "mean",
           "range": true,
           "instant": false
@@ -1185,7 +1398,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -1196,7 +1409,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -1207,7 +1420,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_self_lag_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -1268,7 +1481,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -1279,7 +1492,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -1290,7 +1503,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_worker_clock_offset_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -1364,7 +1577,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (outcome) (rate(lag_main_thread_hangs{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (outcome) (rate(lag_main_thread_hangs{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{outcome}}",
           "range": true,
           "instant": false
@@ -1425,7 +1638,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50 {{outcome}}",
           "range": true,
           "instant": false
@@ -1436,7 +1649,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (outcome) (rate(lag_main_thread_hang_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95 {{outcome}}",
           "range": true,
           "instant": false
@@ -1510,7 +1723,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (kind) (rate(lag_stalls{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (kind) (rate(lag_stalls{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{kind}}",
           "range": true,
           "instant": false
@@ -1571,7 +1784,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50 {{kind}}",
           "range": true,
           "instant": false
@@ -1582,7 +1795,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (kind) (rate(lag_stall_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95 {{kind}}",
           "range": true,
           "instant": false
@@ -1643,7 +1856,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (reason) (rate(lag_samples_discarded{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (reason) (rate(lag_samples_discarded{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{reason}}",
           "range": true,
           "instant": false
@@ -1717,7 +1930,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (kind, direction) (rate(lag_clock_jumps{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (kind, direction) (rate(lag_clock_jumps{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{kind}} {{direction}}",
           "range": true,
           "instant": false
@@ -1778,7 +1991,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -1789,7 +2002,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -1800,7 +2013,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_clock_skew_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -1863,7 +2076,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\"}[$__range])))",
+          "expr": "histogram_quantile(0.5, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__range])))",
           "legendFormat": "p50",
           "range": false,
           "instant": true
@@ -1874,7 +2087,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum(increase(lag_clock_resolution_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__range])))",
           "legendFormat": "p95",
           "range": false,
           "instant": true
@@ -1948,7 +2161,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -1959,7 +2172,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -1970,7 +2183,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_blocking_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -2031,7 +2244,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -2042,7 +2255,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -2053,7 +2266,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -2114,7 +2327,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * histogram_count(sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "60 * histogram_count(sum (rate(lag_loaf_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "frames/min",
           "range": true,
           "instant": false
@@ -2193,7 +2406,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (sum_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | keep script_invoker_type, script_invoker, script_source_url, blocking_duration_ms | unwrap blocking_duration_ms [$__range]))",
+          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (sum_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | keep script_invoker_type, script_invoker, script_source_url, blocking_duration_ms | unwrap blocking_duration_ms [$__range]))",
           "legendFormat": "",
           "queryType": "instant"
         },
@@ -2203,7 +2416,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (count_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | keep script_invoker_type, script_invoker, script_source_url [$__range]))",
+          "expr": "sum by (script_invoker_type, script_invoker, script_source_url) (count_over_time({service_name=~\"$service_name\", event_name=\"lag.long_animation_frame\"} | service_instance_id=~\"$instance\" | keep script_invoker_type, script_invoker, script_source_url [$__range]))",
           "legendFormat": "",
           "queryType": "instant"
         }
@@ -2303,7 +2516,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "{{interaction}}",
           "range": true,
           "instant": false
@@ -2364,7 +2577,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_event_input_delay_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_input_delay_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "input delay",
           "range": true,
           "instant": false
@@ -2375,7 +2588,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_event_processing_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_processing_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "processing",
           "range": true,
           "instant": false
@@ -2386,7 +2599,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_event_presentation_delay_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_event_presentation_delay_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "presentation delay",
           "range": true,
           "instant": false
@@ -2447,7 +2660,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * histogram_count(sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "60 * histogram_count(sum by (interaction) (rate(lag_event_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "{{interaction}}",
           "range": true,
           "instant": false
@@ -2522,7 +2735,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -2533,7 +2746,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -2544,7 +2757,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -2605,7 +2818,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * histogram_count(sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "60 * histogram_count(sum (rate(lag_layout_shift_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "shifts/min",
           "range": true,
           "instant": false
@@ -2689,7 +2902,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_inp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "{{navigation_type}}",
           "range": false,
           "instant": true
@@ -2760,7 +2973,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_cls_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_cls_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "{{navigation_type}}",
           "range": false,
           "instant": true
@@ -2831,7 +3044,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "{{navigation_type}}",
           "range": false,
           "instant": true
@@ -2902,7 +3115,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "{{navigation_type}}",
           "range": false,
           "instant": true
@@ -2973,7 +3186,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (increase(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "{{navigation_type}}",
           "range": false,
           "instant": true
@@ -3036,7 +3249,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_count(sum(increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__range])))",
+          "expr": "histogram_count(sum(increase(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__range])))",
           "legendFormat": "page views",
           "range": false,
           "instant": true
@@ -3117,7 +3330,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_inp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_inp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
           "legendFormat": "{{navigation_type}}",
           "range": true,
           "instant": false
@@ -3199,7 +3412,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_cls_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_cls_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
           "legendFormat": "{{navigation_type}}",
           "range": true,
           "instant": false
@@ -3280,7 +3493,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_lcp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
           "legendFormat": "{{navigation_type}}",
           "range": true,
           "instant": false
@@ -3361,7 +3574,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_fcp_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
           "legendFormat": "{{navigation_type}}",
           "range": true,
           "instant": false
@@ -3442,7 +3655,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.75, sum by (navigation_type) (rate(lag_web_vital_ttfb_histogram{service_name=~\"$service_name\", instance=~\"$instance\", navigation_type=~\"$navigation_type\"}[$__rate_interval])))",
           "legendFormat": "{{navigation_type}}",
           "range": true,
           "instant": false
@@ -3509,7 +3722,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type, browser_web_vital_value | unwrap browser_web_vital_value [$__range]) by (browser_web_vital_name, browser_web_vital_navigation_type)",
+          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | service_instance_id=~\"$instance\" | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type, browser_web_vital_value | unwrap browser_web_vital_value [$__range]) by (browser_web_vital_name, browser_web_vital_navigation_type)",
           "legendFormat": "",
           "queryType": "instant"
         },
@@ -3519,7 +3732,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (browser_web_vital_name, browser_web_vital_navigation_type) (count_over_time({service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type [$__range]))",
+          "expr": "sum by (browser_web_vital_name, browser_web_vital_navigation_type) (count_over_time({service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | service_instance_id=~\"$instance\" | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_navigation_type [$__range]))",
           "legendFormat": "",
           "queryType": "instant"
         }
@@ -3626,7 +3839,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_value | unwrap browser_web_vital_value [5m]) by (browser_web_vital_name)",
+          "expr": "quantile_over_time(0.75, {service_name=~\"$service_name\", event_name=\"browser.web_vital\"} | service_instance_id=~\"$instance\" | browser_web_vital_navigation_type=~\"$navigation_type\" | keep browser_web_vital_name, browser_web_vital_value | unwrap browser_web_vital_value [5m]) by (browser_web_vital_name)",
           "legendFormat": "{{browser_web_vital_name}}",
           "queryType": "range"
         }
@@ -3699,7 +3912,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum by (outcome) (rate(lag_frames{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "sum by (outcome) (rate(lag_frames{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{outcome}}",
           "range": true,
           "instant": false
@@ -3760,7 +3973,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(rate(lag_frames{service_name=~\"$service_name\", outcome=\"dropped\"}[$__rate_interval])) / sum(rate(lag_frames{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "sum(rate(lag_frames{service_name=~\"$service_name\", instance=~\"$instance\", outcome=\"dropped\"}[$__rate_interval])) / sum(rate(lag_frames{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "dropped",
           "range": true,
           "instant": false
@@ -3821,7 +4034,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -3832,7 +4045,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -3843,7 +4056,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_frame_delta_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -3917,7 +4130,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.1, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.1, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p10",
           "range": true,
           "instant": false
@@ -3928,7 +4141,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -3939,7 +4152,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.9, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.9, sum (rate(lag_idle_time_remaining_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p90",
           "range": true,
           "instant": false
@@ -4000,7 +4213,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -4011,7 +4224,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -4022,7 +4235,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_idle_gap_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -4083,7 +4296,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (timed_out) (rate(lag_idle_callbacks{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (timed_out) (rate(lag_idle_callbacks{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "timed out: {{timed_out}}",
           "range": true,
           "instant": false
@@ -4144,7 +4357,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(rate(lag_idle_callbacks{service_name=~\"$service_name\", timed_out=\"true\"}[$__rate_interval])) / sum(rate(lag_idle_callbacks{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "sum(rate(lag_idle_callbacks{service_name=~\"$service_name\", instance=~\"$instance\", timed_out=\"true\"}[$__rate_interval])) / sum(rate(lag_idle_callbacks{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "timed out",
           "range": true,
           "instant": false
@@ -4218,7 +4431,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50 {{source}}",
           "range": true,
           "instant": false
@@ -4229,7 +4442,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (source) (rate(lag_memory_used_bytes_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95 {{source}}",
           "range": true,
           "instant": false
@@ -4290,7 +4503,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -4301,7 +4514,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_memory_usage_ratio_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -4377,7 +4590,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_avg(sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_avg(sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "{{source}}",
           "range": true,
           "instant": false
@@ -4438,7 +4651,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "1 - histogram_fraction(-Inf, 1.5, sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "1 - histogram_fraction(-Inf, 1.5, sum by (source) (rate(lag_pressure_state_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "{{source}}",
           "range": true,
           "instant": false
@@ -4512,7 +4725,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum (rate(lag_gc_events{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum (rate(lag_gc_events{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "GC events/min",
           "range": true,
           "instant": false
@@ -4573,7 +4786,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (from, to, trigger) (rate(lag_lifecycle_transitions{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (from, to, trigger) (rate(lag_lifecycle_transitions{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{from}} → {{to}} ({{trigger}})",
           "range": true,
           "instant": false
@@ -4634,7 +4847,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(rate(lag_timer_calibrations{service_name=~\"$service_name\", throttled=\"true\"}[$__rate_interval])) / sum(rate(lag_timer_calibrations{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "sum(rate(lag_timer_calibrations{service_name=~\"$service_name\", instance=~\"$instance\", throttled=\"true\"}[$__rate_interval])) / sum(rate(lag_timer_calibrations{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "throttled",
           "range": true,
           "instant": false
@@ -4708,7 +4921,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * sum by (type) (rate(lag_browser_reports{service_name=~\"$service_name\"}[$__rate_interval]))",
+          "expr": "60 * sum by (type) (rate(lag_browser_reports{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{type}}",
           "range": true,
           "instant": false
@@ -4758,7 +4971,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | label_format report_id=id",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.browser_report\"} | service_instance_id=~\"$instance\" | label_format report_id=id",
           "legendFormat": "",
           "queryType": "range",
           "maxLines": 200
@@ -4881,7 +5094,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.5, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "instant": false
@@ -4892,7 +5105,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.95, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "instant": false
@@ -4903,7 +5116,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "histogram_quantile(0.99, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "instant": false
@@ -4964,7 +5177,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "60 * histogram_count(sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\"}[$__rate_interval])))",
+          "expr": "60 * histogram_count(sum (rate(lag_liveness_block_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "blocks/min",
           "range": true,
           "instant": false
@@ -5039,7 +5252,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (event_name) (count_over_time({service_name=~\"$service_name\", event_name=~\".+\"} [1m]))",
+          "expr": "sum by (event_name) (count_over_time({service_name=~\"$service_name\", event_name=~\".+\"} | service_instance_id=~\"$instance\" [1m]))",
           "legendFormat": "{{event_name}}",
           "queryType": "range"
         }
@@ -5050,6 +5263,216 @@
         "w": 24,
         "x": 0,
         "y": 198
+      }
+    },
+    {
+      "type": "table",
+      "title": "Page loads",
+      "description": "The page loads (SDK instances) with lag events in the time range, with the number of events. Set Session to see the page loads of one session. A click on a page load sets the Page load variable: then each panel and each annotation shows only that page load.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Page load"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Show only this page load",
+                    "url": "/d/lag-monitor/lag-monitor?var-instance=${__value.raw}&var-service_name=${service_name}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Events",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "topk(50, sum by (service_instance_id, session_id) (count_over_time({service_name=~\"$service_name\", event_name=~\".+\"} | service_instance_id=~\"$instance\" | session_id=~\"${session_id:regex}.*\" [$__range])))",
+          "legendFormat": "",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "service_instance_id": 0,
+              "session_id": 1,
+              "Value": 2,
+              "Value #A": 2
+            },
+            "renameByName": {
+              "service_instance_id": "Page load",
+              "session_id": "Session",
+              "Value": "Events",
+              "Value #A": "Events"
+            }
+          }
+        }
+      ],
+      "id": 85,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 205
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent page views and lifecycle transitions",
+      "description": "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service_name\", event_name=~\"lag.page_view.start|lag.lifecycle.transition\"} | service_instance_id=~\"$instance\"",
+          "legendFormat": "",
+          "queryType": "range",
+          "maxLines": 200
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "format": "auto",
+            "replace": false,
+            "keepTime": false
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "event_name",
+                "navigation_type",
+                "from",
+                "to",
+                "trigger",
+                "lag_page_view_url",
+                "lag_page_view_id",
+                "lag_page_view_previous_id",
+                "session_id",
+                "service_instance_id"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Time": 0,
+              "event_name": 1,
+              "navigation_type": 2,
+              "from": 3,
+              "to": 4,
+              "trigger": 5,
+              "lag_page_view_url": 6,
+              "lag_page_view_id": 7,
+              "lag_page_view_previous_id": 8,
+              "session_id": 9,
+              "service_instance_id": 10
+            },
+            "renameByName": {
+              "event_name": "Event",
+              "navigation_type": "Navigation",
+              "from": "From",
+              "to": "To",
+              "trigger": "Trigger",
+              "lag_page_view_url": "URL",
+              "lag_page_view_id": "Page view",
+              "lag_page_view_previous_id": "Previous view",
+              "session_id": "Session",
+              "service_instance_id": "Instance"
+            }
+          }
+        }
+      ],
+      "id": 86,
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 213
       }
     },
     {
@@ -5101,7 +5524,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service_name\", event_name=~\"lag.main_thread.hang|lag.stall\"}",
+          "expr": "{service_name=~\"$service_name\", event_name=~\"lag.main_thread.hang|lag.stall\"} | service_instance_id=~\"$instance\"",
           "legendFormat": "",
           "queryType": "range",
           "maxLines": 200
@@ -5168,12 +5591,12 @@
           }
         }
       ],
-      "id": 85,
+      "id": 87,
       "gridPos": {
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 205
+        "y": 222
       }
     },
     {
@@ -5249,7 +5672,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"}",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.clock.jump\"} | service_instance_id=~\"$instance\"",
           "legendFormat": "",
           "queryType": "range",
           "maxLines": 200
@@ -5310,31 +5733,31 @@
           }
         }
       ],
-      "id": 86,
+      "id": 88,
       "gridPos": {
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 215
+        "y": 232
       }
     },
     {
       "type": "row",
-      "title": "Long range (recording rules)",
+      "title": "Long range (recording rules, all page loads)",
       "collapsed": false,
       "panels": [],
-      "id": 87,
+      "id": 89,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 222
+        "y": 239
       }
     },
     {
       "type": "timeseries",
       "title": "p95 by service (recorded)",
-      "description": "From the recording rules service_name:<metric>:p95_rate5m (5-minute windows, evaluated each minute). Use these panels for long time ranges.",
+      "description": "From the recording rules service_name:<metric>:p95_rate5m (5-minute windows, evaluated each minute). Use these panels for long time ranges. The rules sum all page loads, thus the Page load variable does not apply here.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -5439,12 +5862,12 @@
           "instant": false
         }
       ],
-      "id": 88,
+      "id": 90,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 223
+        "y": 240
       }
     },
     {
@@ -5555,12 +5978,12 @@
           "instant": false
         }
       ],
-      "id": 89,
+      "id": 91,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 223
+        "y": 240
       }
     },
     {
@@ -5671,12 +6094,12 @@
           "instant": false
         }
       ],
-      "id": 90,
+      "id": 92,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 231
+        "y": 248
       }
     },
     {
@@ -5797,12 +6220,12 @@
           "instant": false
         }
       ],
-      "id": 91,
+      "id": 93,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 231
+        "y": 248
       }
     }
   ]
