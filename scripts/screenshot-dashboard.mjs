@@ -55,14 +55,25 @@ const page = await browser.newPage({ viewport : { width : 1600, height : 1200 },
 // For a review of the annotation layers: each query that Grafana sends for them, and its result
 const annotationQueries = [];
 const consoleErrors = [];
+/** The fields of the log frames of the Loki panels: the transformations of the tables use them. */
+const logFrames = [];
 page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
 page.on("response", async (response) => {
     if (!response.url().includes("/api/ds/query")) return;
     const request = response.request().postData() ?? "";
-    if (!request.includes("logfmt")) return;
     let body;
     try { body = await response.json(); } catch { body = undefined; }
     const results = body?.results ?? {};
+    if (!request.includes("logfmt")) {
+        for (const [refId, result] of Object.entries(results)) {
+            const frame = result.frames?.[0];
+            const fields = frame?.schema?.fields?.map(f => `${f.name}:${f.type}`) ?? [];
+            if (fields.some(f => f.startsWith("labels:") || f.startsWith("Line:") || f.startsWith("body:")) && logFrames.length < 20) {
+                logFrames.push({ refId, fields, rows : frame?.data?.values?.[0]?.length ?? 0, firstLabels : frame?.data?.values?.find(v => typeof v?.[0] === "object")?.[0] });
+            }
+        }
+        return;
+    }
     annotationQueries.push({
         status : response.status(),
         queries : JSON.parse(request).queries?.map(q => ({ refId : q.refId, expr : q.expr, queryType : q.queryType })),
@@ -93,5 +104,5 @@ for (const index of args.pages.split(",").map(Number)) {
     await shoot(`/d/lag-monitor-review/lag-monitor-review?var-service_name=${sample.service}&var-instance=${sample.instanceId}`, `page-${index}.png`);
 }
 await browser.close();
-writeFileSync(join(args.out, "annotations.json"), JSON.stringify({ annotationQueries, consoleErrors }, null, 2));
+writeFileSync(join(args.out, "annotations.json"), JSON.stringify({ annotationQueries, consoleErrors, logFrames }, null, 2));
 console.log(`Annotation queries: ${annotationQueries.length}; console errors: ${consoleErrors.length}`);
