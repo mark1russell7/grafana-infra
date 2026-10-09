@@ -5531,7 +5531,7 @@
     {
       "type": "table",
       "title": "Recent hangs and stalls",
-      "description": "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
+      "description": "The latest lag.main_thread.hang and lag.stall events. The worker sends the hang start itself (scope @mark1russell7/lag/worker), because the main thread cannot. An abandoned hang comes from the next page of the origin (Source: journal), another open page (peer), or the page itself at its close (self).",
       "datasource": {
         "type": "loki",
         "uid": "loki"

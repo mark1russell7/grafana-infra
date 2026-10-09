@@ -231,9 +231,9 @@ For the traces of the page views, give the lag monitors a span sink:
 
 ```ts
 import * as api from "@opentelemetry/api";
-import { createOtelSpanSink } from "@lag/core";
+import { createOtelSpanSink } from "@mark1russell7/lag";
 
-const spans = createOtelSpanSink(api.trace.getTracer("@lag/core"), api);
+const spans = createOtelSpanSink(api.trace.getTracer("@mark1russell7/lag"), api);
 ```
 
 Use the same `resource` for the `TracerProvider`, and send the spans with the OTLP/HTTP exporter to `/v1/traces`. Flush the tracer provider when the page becomes hidden: the span of a view ends at that time. otel-ts registers its tracer provider as the global provider, and it flushes it.

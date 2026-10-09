@@ -273,11 +273,11 @@ async function lokiEvents() {
 
     // The worker path: a JSON body from encodeOtlpLogs, posted with fetch keepalive
     const worker = await lokiGet("/loki/api/v1/query_range", {
-        query : `{service_name=~"${serviceRegex}", event_name="lag.main_thread.hang"} | scope_name="@lag/worker"`, start, end, limit : "20",
+        query : `{service_name=~"${serviceRegex}", event_name="lag.main_thread.hang"} | scope_name="@mark1russell7/lag/worker"`, start, end, limit : "20",
     });
     const workerEntries = (worker.data?.result ?? []).flatMap(s => s.values);
     const phases = workerEntries.map(v => v[2]?.structuredMetadata?.phase).sort();
-    check(workerEntries.length > 0, `worker hang reports (scope @lag/worker) in Loki: ${workerEntries.length}, phases ${phases.join(", ")}, line "${workerEntries[0]?.[1]}"`);
+    check(workerEntries.length > 0, `worker hang reports (scope @mark1russell7/lag/worker) in Loki: ${workerEntries.length}, phases ${phases.join(", ")}, line "${workerEntries[0]?.[1]}"`);
     if (summary) {
         for (const report of summary.workerReports) {
             check(report.status === 200 && report.allowOrigin === "http://localhost:5173",
