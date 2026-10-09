@@ -132,6 +132,19 @@ const SCRIPTS = [
 ];
 
 const PRESSURE_STATES = ["nominal", "fair", "serious", "critical"];
+
+/**
+ * The line of an event, as formatEventLine of the lag library: the name, and
+ * the attributes as sorted key=value pairs. A value goes into JSON quotes when
+ * it is empty or has a space, a quote or "=".
+ */
+function formatEventLine(name, attributes) {
+    const value = (v) => {
+        const text = String(v);
+        return text === "" || /[\s="]/.test(text) ? JSON.stringify(text) : text;
+    };
+    return [name, ...Object.keys(attributes).sort().map(key => `${key}=${value(attributes[key])}`)].join(" ");
+}
 const ALL_FEATURES = ["loaf", "eventTiming", "memory", "pressure", "liveness", "idle"];
 
 /**
@@ -292,16 +305,21 @@ class Page {
     }
 
     /**
-     * As createOtelEventSink: eventName, severity INFO, no body, and the time
-     * of the occurrence as the time of the record (`timeMs`, the start of an
-     * event with a duration). Without it, the record gets the time of the call.
+     * As createOtelEventSink: eventName, severity INFO, the line of the event
+     * as the body, and the time of the occurrence as the time of the record
+     * (`timeMs`, the start of an event with a duration). Without it, the
+     * record gets the time of the call. The body makes the lines of one
+     * millisecond different: Loki drops an entry with the time and the line
+     * of the previous entry of its stream.
      */
     emit(name, attributes, timeMs) {
+        const all = { ...attributes, "lag.page_view.id" : this.view.id, "session.id" : this.sessionId };
         this.logger.emit({
             eventName : name,
             severityText : "INFO",
             severityNumber : 9,
-            attributes : { ...attributes, "lag.page_view.id" : this.view.id, "session.id" : this.sessionId },
+            body : formatEventLine(name, all),
+            attributes : all,
             ...(timeMs === undefined ? {} : { timestamp : timeMs }),
         });
         counts.events[name] = (counts.events[name] ?? 0) + 1;
