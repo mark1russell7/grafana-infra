@@ -27,6 +27,15 @@ datasources:
           url: "$${__value.raw}"
           datasourceUid: tempo
           matcherType: regex
+        # The lag.page_view.start event has the trace ID of its page view. Loki
+        # keeps it as the structured metadata lag_page_view_trace_id. A label
+        # matcher reads it, thus Explore shows a link to the trace in Tempo.
+        - name: Page view trace
+          matcherRegex: lag_page_view_trace_id
+          url: "$${__value.raw}"
+          datasourceUid: tempo
+          matcherType: label
+          urlDisplayLabel: Open the trace of the page view
 
   - name: Tempo
     type: tempo
@@ -36,10 +45,15 @@ datasources:
     jsonData:
       tracesToMetrics:
         datasourceUid: mimir
-      tracesToLogs:
+      # "Logs for this span": the lag events of the same page load, from 1 minute
+      # before the span to 1 minute after it. Loki keeps service.name as the
+      # label service_name, and service.instance.id as structured metadata.
+      tracesToLogsV2:
         datasourceUid: loki
-        tags:
-          - service.name
+        spanStartTimeShift: "-1m"
+        spanEndTimeShift: "1m"
+        customQuery: true
+        query: '{service_name="$${__span.tags["service.name"]}"} | service_instance_id="$${__span.tags["service.instance.id"]}"'
       nodeGraph:
         enabled: true
       serviceMap:

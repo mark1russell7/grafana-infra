@@ -1,7 +1,7 @@
 {
   "uid": "lag-monitor",
   "title": "Lag Monitor",
-  "description": "Main-thread lag of browser pages, from the lag library: native-histogram metrics in Mimir and events in Loki.",
+  "description": "Main-thread lag of browser pages, from the lag library: native-histogram metrics in Mimir, events in Loki and the traces of the page views in Tempo.",
   "tags": [
     "lag",
     "performance",
@@ -5367,7 +5367,7 @@
     {
       "type": "table",
       "title": "Recent page views and lifecycle transitions",
-      "description": "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts.",
+      "description": "The latest lag.page_view.start and lag.lifecycle.transition events. The annotations Page views and Lifecycle show the same events on the charts. Trace: the trace of the page view (lag.page_view.trace_id). A click on it opens the trace in Tempo. The trace shows the view, and its hangs, stalls, long animation frames and hidden periods, with their real start and end. A view whose span was not sampled has no trace.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -5381,7 +5381,42 @@
             }
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Trace"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the trace of the page view in Tempo",
+                    "url": "",
+                    "internal": {
+                      "datasourceUid": "tempo",
+                      "datasourceName": "Tempo",
+                      "query": {
+                        "refId": "A",
+                        "datasource": {
+                          "type": "tempo",
+                          "uid": "tempo"
+                        },
+                        "queryType": "traceql",
+                        "query": "${__value.raw}"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 270
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true,
@@ -5429,6 +5464,7 @@
                 "trigger",
                 "lag_page_view_url",
                 "lag_page_view_id",
+                "lag_page_view_trace_id",
                 "lag_page_view_previous_id",
                 "session_id",
                 "service_instance_id"
@@ -5448,9 +5484,10 @@
               "trigger": 5,
               "lag_page_view_url": 6,
               "lag_page_view_id": 7,
-              "lag_page_view_previous_id": 8,
-              "session_id": 9,
-              "service_instance_id": 10
+              "lag_page_view_trace_id": 8,
+              "lag_page_view_previous_id": 9,
+              "session_id": 10,
+              "service_instance_id": 11
             },
             "renameByName": {
               "event_name": "Event",
@@ -5460,6 +5497,7 @@
               "trigger": "Trigger",
               "lag_page_view_url": "URL",
               "lag_page_view_id": "Page view",
+              "lag_page_view_trace_id": "Trace",
               "lag_page_view_previous_id": "Previous view",
               "session_id": "Session",
               "service_instance_id": "Instance"
@@ -5743,7 +5781,7 @@
     },
     {
       "type": "row",
-      "title": "Long range (recording rules, all page loads)",
+      "title": "Page view traces (Tempo)",
       "collapsed": false,
       "panels": [],
       "id": 89,
@@ -5752,6 +5790,63 @@
         "w": 24,
         "x": 0,
         "y": 239
+      }
+    },
+    {
+      "type": "table",
+      "title": "Page view traces",
+      "description": "The traces of the page views in the time range, from Tempo: one trace for each view. The root span lag.page_view ends when the page is hidden for the first time in the view. The hangs, stalls, long animation frames and hidden periods of the view are spans in it. An abandoned hang is in the trace of the page that hung. A click on a trace ID opens the trace. Select one page load to see only its views.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{ name = \"lag.page_view\" && resource.service.name =~ \"$service_name\" && resource.service.instance.id =~ \"$instance\" }",
+          "limit": 50,
+          "tableType": "traces"
+        }
+      ],
+      "id": 90,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 240
+      }
+    },
+    {
+      "type": "row",
+      "title": "Long range (recording rules, all page loads)",
+      "collapsed": false,
+      "panels": [],
+      "id": 91,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 248
       }
     },
     {
@@ -5862,12 +5957,12 @@
           "instant": false
         }
       ],
-      "id": 90,
+      "id": 92,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 240
+        "y": 249
       }
     },
     {
@@ -5978,12 +6073,12 @@
           "instant": false
         }
       ],
-      "id": 91,
+      "id": 93,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 240
+        "y": 249
       }
     },
     {
@@ -6094,12 +6189,12 @@
           "instant": false
         }
       ],
-      "id": 92,
+      "id": 94,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 248
+        "y": 257
       }
     },
     {
@@ -6220,12 +6315,12 @@
           "instant": false
         }
       ],
-      "id": 93,
+      "id": 95,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 248
+        "y": 257
       }
     }
   ]
