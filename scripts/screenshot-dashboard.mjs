@@ -98,6 +98,22 @@ async function shoot(path, file) {
 }
 
 await shoot("/d/lag-monitor/lag-monitor", "fleet.png");
+
+// The tables of events, one at a time: each one in view, after its query
+const tables = [];
+for (const title of ["Page loads", "Recent page views and lifecycle transitions", "Recent hangs and stalls", "Recent clock jumps"]) {
+    const panel = page.locator(`[data-viz-panel-key], section`).filter({ has : page.getByText(title, { exact : true }) }).first();
+    try {
+        await panel.scrollIntoViewIfNeeded({ timeout : 10_000 });
+        await page.waitForTimeout(4_000);
+        const file = `table-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}.png`;
+        await panel.screenshot({ path : join(args.out, file) });
+        tables.push({ title, file, text : (await panel.innerText()).slice(0, 400) });
+    } catch (error) {
+        tables.push({ title, error : String(error).slice(0, 300) });
+    }
+}
+writeFileSync(join(args.out, "tables.json"), JSON.stringify(tables, null, 2));
 for (const index of args.pages.split(",").map(Number)) {
     const sample = summary.pages.find(p => p.index === index);
     if (!sample) continue;
