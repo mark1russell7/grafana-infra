@@ -98,7 +98,7 @@ Do not promote `session.id`. Each session then gets its own series, and `session
 
 The limits use this rule: in-memory series = R × 2.5 h × S.
 
-- S is the number of series of one SDK instance. The lag catalog has 42 metrics.
+- S is the number of series of one SDK instance. The lag catalog has 43 metrics. One of them, `lag_long_callback_duration_histogram`, comes only from the add-on `@mark1russell7/lag/async-context`.
 - With native histograms, one page load has approximately 85 series and one `target_info` series. Then S = 100.
 - R is the number of SDK instances in one hour. This stack plans for 2,000 page loads in one hour.
 - The series of a closed page stay in memory until the next head compaction. For this reason, the rule uses 2.5 h.
@@ -269,6 +269,7 @@ Each kind of lag event is an annotation layer, with its own switch at the top of
 | Clock jumps | `lag.clock.jump` | no |
 | Long animation frames | `lag.long_animation_frame` | no |
 | Browser reports | `lag.browser_report` | no |
+| Long callbacks | `lag.long_callback` | no |
 
 The layers with many events are off by default. With all page loads, the marks of all pages are on the panels. Select one page load first, then turn on the layers. Each layer follows the Service and Page load variables. Its query parses the line of the event with `logfmt`, thus the title and the text of a mark can use each attribute.
 
@@ -281,13 +282,14 @@ The dashboard has one row for each monitor family:
 - hangs, and the measurement conditions (stalls and discarded samples)
 - clock (jumps, skew and resolution)
 - long animation frames
+- long callbacks: the add-on `@mark1russell7/lag/async-context`, also in Firefox and Safari
 - event timing and layout shift
 - Web Vitals, with the good and poor thresholds
 - frames, idle time, memory and compute pressure
 - GC, page lifecycle and timer throttling
 - browser reports and shared-memory liveness
 
-Loki panels show the events: the page loads and their sessions, recent page views and lifecycle transitions, recent hangs and stalls, clock jumps, browser reports, LoAF attribution and Web Vitals values. The last row uses the recording rules.
+Loki panels show the events: the page loads and their sessions, recent page views and lifecycle transitions, recent hangs and stalls, clock jumps, browser reports, LoAF attribution, the long callbacks by operation and callback, and Web Vitals values. The last row uses the recording rules.
 
 ### The Trace link
 
@@ -330,7 +332,9 @@ The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$_
 
 `scripts/send-sample-data.mjs` uses the OpenTelemetry JS SDK in the same way as a browser. It simulates six page loads of two services. Each page load has its own `service.instance.id`. The script records each metric of the lag catalog and sends each lag event. It also posts hang reports in the JSON shape of the lag worker, with `fetch` and `keepalive`.
 
-The script also sends the spans, as `createOtelSpanSink` sends them: one trace for each page view, with the hangs, stalls, long animation frames and hidden and frozen periods of the view in it. It also sends the trace of an earlier page that hung and closed during its hang. Only the trace of that page is in the sample, not its metrics or events. A sample page reports the abandoned hang from the hang journal: the span of the hang is in the trace of the page that hung, with a link to the view of the sample page.
+Three of the page loads also have the add-on `@mark1russell7/lag/async-context`: they send the long callbacks, with and without an operation.
+
+The script also sends the spans, as `createOtelSpanSink` sends them: one trace for each page view, with the hangs, stalls, long animation frames, long callbacks and hidden and frozen periods of the view in it. It also sends the trace of an earlier page that hung and closed during its hang. Only the trace of that page is in the sample, not its metrics or events. A sample page reports the abandoned hang from the hang journal: the span of the hang is in the trace of the page that hung, with a link to the view of the sample page.
 
 `scripts/verify-pipeline.mjs` checks these items:
 
@@ -340,6 +344,7 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - The `instance` label is the `service.instance.id`. No series has a `session_id` label.
 - The recording rules are healthy and have data.
 - Loki has only the index labels `service_name` and `event_name`, and it has all the lag events.
+- The long callbacks have only the source kinds of the closed set. Each `lag.long_callback` event has a callback name, a source and 50 ms or more, and some events have an operation.
 - Tempo has one trace for each page view of the sample. The root span `lag.page_view` has the ID of the view, and each other span of the trace has the root as its parent. The spans have the attributes of the span catalog.
 - The abandoned hang is in the trace of the page that hung, and it has a link to the view that reported it.
 - The `lag.page_view.start` events have the trace ID and the span ID of their view.

@@ -203,6 +203,27 @@
         "titleFormat": "{{type}}: {{id}}",
         "textFormat": "{{message}}",
         "tagKeys": "type"
+      },
+      {
+        "name": "Long callbacks",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": false,
+        "hide": false,
+        "iconColor": "#ff9830",
+        "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_callback\"} | service_instance_id=~\"$instance\" | logfmt",
+        "instant": false,
+        "maxLines": 500,
+        "target": {
+          "refId": "Anno",
+          "expr": "{service_name=~\"$service_name\", event_name=\"lag.long_callback\"} | service_instance_id=~\"$instance\" | logfmt",
+          "queryType": "range"
+        },
+        "titleFormat": "Long callback: {{callback_name}}",
+        "textFormat": "{{duration_ms}} ms, {{callback_source}}, operation {{operation}}",
+        "tagKeys": "source_kind"
       }
     ]
   },
@@ -2458,7 +2479,7 @@
     },
     {
       "type": "row",
-      "title": "Event timing (EventTimingMonitor)",
+      "title": "Long callbacks (LongCallbackMonitor, the add-on @mark1russell7/lag/async-context)",
       "collapsed": false,
       "panels": [],
       "id": 37,
@@ -2467,6 +2488,340 @@
         "w": 24,
         "x": 0,
         "y": 85
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Long callback duration p50 / p95 / p99",
+      "description": "The duration of each callback of 50 ms or more that the callback hook of async-browser-context measured. Only apps that enable the add-on send it, also from Firefox and Safari, which have no long animation frames.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.5, sum (rate(lag_long_callback_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum (rate(lag_long_callback_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.99, sum (rate(lag_long_callback_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Long callback duration p95, by source kind",
+      "description": "The p95 of the long callbacks of each source kind: timer, promise, event, await, observer, stream, lock, frame or other.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (source_kind) (rate(lag_long_callback_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{source_kind}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Long callbacks per minute, by source kind",
+      "description": "The number of long callbacks of each source kind, each minute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "60 * histogram_count(sum by (source_kind) (rate(lag_long_callback_duration_histogram{service_name=~\"$service_name\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{source_kind}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 86
+      }
+    },
+    {
+      "type": "table",
+      "title": "Long callbacks by operation and callback (events)",
+      "description": "From the lag.long_callback events: the total time and the number of the long callbacks of each operation and function. The operation comes from a function of the app, for example the name of the active span. The add-on sends at most 10 events each minute for each page.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Total time",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (operation, callback_name, callback_source, source_kind) (sum_over_time({service_name=~\"$service_name\", event_name=\"lag.long_callback\"} | service_instance_id=~\"$instance\" | keep operation, callback_name, callback_source, source_kind, duration_ms | unwrap duration_ms [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (operation, callback_name, callback_source, source_kind) (count_over_time({service_name=~\"$service_name\", event_name=\"lag.long_callback\"} | service_instance_id=~\"$instance\" | keep operation, callback_name, callback_source, source_kind [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Total time",
+              "Value #B": "Callbacks",
+              "operation": "Operation",
+              "callback_name": "Callback",
+              "callback_source": "Source",
+              "source_kind": "Source kind"
+            }
+          }
+        }
+      ],
+      "id": 41,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      }
+    },
+    {
+      "type": "row",
+      "title": "Event timing (EventTimingMonitor)",
+      "collapsed": false,
+      "panels": [],
+      "id": 42,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 102
       }
     },
     {
@@ -2522,12 +2877,12 @@
           "instant": false
         }
       ],
-      "id": 38,
+      "id": 43,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 86
+        "y": 103
       }
     },
     {
@@ -2605,12 +2960,12 @@
           "instant": false
         }
       ],
-      "id": 39,
+      "id": 44,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 86
+        "y": 103
       }
     },
     {
@@ -2666,12 +3021,12 @@
           "instant": false
         }
       ],
-      "id": 40,
+      "id": 45,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 86
+        "y": 103
       }
     },
     {
@@ -2679,12 +3034,12 @@
       "title": "Layout shift (LayoutShiftMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 41,
+      "id": 46,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 94
+        "y": 111
       }
     },
     {
@@ -2763,12 +3118,12 @@
           "instant": false
         }
       ],
-      "id": 42,
+      "id": 47,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 95
+        "y": 112
       }
     },
     {
@@ -2824,12 +3179,12 @@
           "instant": false
         }
       ],
-      "id": 43,
+      "id": 48,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 95
+        "y": 112
       }
     },
     {
@@ -2837,12 +3192,12 @@
       "title": "Web Vitals (PageViewVitals)",
       "collapsed": false,
       "panels": [],
-      "id": 44,
+      "id": 49,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 103
+        "y": 120
       }
     },
     {
@@ -2908,12 +3263,12 @@
           "instant": true
         }
       ],
-      "id": 45,
+      "id": 50,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 0,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -2979,12 +3334,12 @@
           "instant": true
         }
       ],
-      "id": 46,
+      "id": 51,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 4,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -3050,12 +3405,12 @@
           "instant": true
         }
       ],
-      "id": 47,
+      "id": 52,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 8,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -3121,12 +3476,12 @@
           "instant": true
         }
       ],
-      "id": 48,
+      "id": 53,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 12,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -3192,12 +3547,12 @@
           "instant": true
         }
       ],
-      "id": 49,
+      "id": 54,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 16,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -3255,12 +3610,12 @@
           "instant": true
         }
       ],
-      "id": 50,
+      "id": 55,
       "gridPos": {
         "h": 6,
         "w": 4,
         "x": 20,
-        "y": 104
+        "y": 121
       }
     },
     {
@@ -3336,12 +3691,12 @@
           "instant": false
         }
       ],
-      "id": 51,
+      "id": 56,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 110
+        "y": 127
       }
     },
     {
@@ -3418,12 +3773,12 @@
           "instant": false
         }
       ],
-      "id": 52,
+      "id": 57,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 110
+        "y": 127
       }
     },
     {
@@ -3499,12 +3854,12 @@
           "instant": false
         }
       ],
-      "id": 53,
+      "id": 58,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 118
+        "y": 135
       }
     },
     {
@@ -3580,12 +3935,12 @@
           "instant": false
         }
       ],
-      "id": 54,
+      "id": 59,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 118
+        "y": 135
       }
     },
     {
@@ -3661,12 +4016,12 @@
           "instant": false
         }
       ],
-      "id": 55,
+      "id": 60,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 118
+        "y": 135
       }
     },
     {
@@ -3763,12 +4118,12 @@
           }
         }
       ],
-      "id": 56,
+      "id": 61,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 126
+        "y": 143
       }
     },
     {
@@ -3844,12 +4199,12 @@
           "queryType": "range"
         }
       ],
-      "id": 57,
+      "id": 62,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 126
+        "y": 143
       }
     },
     {
@@ -3857,12 +4212,12 @@
       "title": "Frames (FrameTimingMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 58,
+      "id": 63,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 134
+        "y": 151
       }
     },
     {
@@ -3918,12 +4273,12 @@
           "instant": false
         }
       ],
-      "id": 59,
+      "id": 64,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 135
+        "y": 152
       }
     },
     {
@@ -3979,12 +4334,12 @@
           "instant": false
         }
       ],
-      "id": 60,
+      "id": 65,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 135
+        "y": 152
       }
     },
     {
@@ -4062,12 +4417,12 @@
           "instant": false
         }
       ],
-      "id": 61,
+      "id": 66,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 135
+        "y": 152
       }
     },
     {
@@ -4075,12 +4430,12 @@
       "title": "Idle time (IdleAvailabilityMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 62,
+      "id": 67,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 143
+        "y": 160
       }
     },
     {
@@ -4158,12 +4513,12 @@
           "instant": false
         }
       ],
-      "id": 63,
+      "id": 68,
       "gridPos": {
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 144
+        "y": 161
       }
     },
     {
@@ -4241,12 +4596,12 @@
           "instant": false
         }
       ],
-      "id": 64,
+      "id": 69,
       "gridPos": {
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 144
+        "y": 161
       }
     },
     {
@@ -4302,12 +4657,12 @@
           "instant": false
         }
       ],
-      "id": 65,
+      "id": 70,
       "gridPos": {
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 144
+        "y": 161
       }
     },
     {
@@ -4363,12 +4718,12 @@
           "instant": false
         }
       ],
-      "id": 66,
+      "id": 71,
       "gridPos": {
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 144
+        "y": 161
       }
     },
     {
@@ -4376,12 +4731,12 @@
       "title": "Memory (MemoryMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 67,
+      "id": 72,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 152
+        "y": 169
       }
     },
     {
@@ -4448,12 +4803,12 @@
           "instant": false
         }
       ],
-      "id": 68,
+      "id": 73,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 153
+        "y": 170
       }
     },
     {
@@ -4520,12 +4875,12 @@
           "instant": false
         }
       ],
-      "id": 69,
+      "id": 74,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 153
+        "y": 170
       }
     },
     {
@@ -4533,12 +4888,12 @@
       "title": "Compute pressure (ComputePressureMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 70,
+      "id": 75,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 161
+        "y": 178
       }
     },
     {
@@ -4596,12 +4951,12 @@
           "instant": false
         }
       ],
-      "id": 71,
+      "id": 76,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 162
+        "y": 179
       }
     },
     {
@@ -4657,12 +5012,12 @@
           "instant": false
         }
       ],
-      "id": 72,
+      "id": 77,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 162
+        "y": 179
       }
     },
     {
@@ -4670,12 +5025,12 @@
       "title": "GC, page lifecycle and timer throttling",
       "collapsed": false,
       "panels": [],
-      "id": 73,
+      "id": 78,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 170
+        "y": 187
       }
     },
     {
@@ -4731,12 +5086,12 @@
           "instant": false
         }
       ],
-      "id": 74,
+      "id": 79,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 171
+        "y": 188
       }
     },
     {
@@ -4792,12 +5147,12 @@
           "instant": false
         }
       ],
-      "id": 75,
+      "id": 80,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 171
+        "y": 188
       }
     },
     {
@@ -4853,12 +5208,12 @@
           "instant": false
         }
       ],
-      "id": 76,
+      "id": 81,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 171
+        "y": 188
       }
     },
     {
@@ -4866,12 +5221,12 @@
       "title": "Browser reports (BrowserReportMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 77,
+      "id": 82,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 179
+        "y": 196
       }
     },
     {
@@ -4927,12 +5282,12 @@
           "instant": false
         }
       ],
-      "id": 78,
+      "id": 83,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 180
+        "y": 197
       }
     },
     {
@@ -5026,12 +5381,12 @@
           }
         }
       ],
-      "id": 79,
+      "id": 84,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 180
+        "y": 197
       }
     },
     {
@@ -5039,12 +5394,12 @@
       "title": "Shared-memory liveness (SharedLivenessMonitor)",
       "collapsed": false,
       "panels": [],
-      "id": 80,
+      "id": 85,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 188
+        "y": 205
       }
     },
     {
@@ -5122,12 +5477,12 @@
           "instant": false
         }
       ],
-      "id": 81,
+      "id": 86,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 189
+        "y": 206
       }
     },
     {
@@ -5183,12 +5538,12 @@
           "instant": false
         }
       ],
-      "id": 82,
+      "id": 87,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 189
+        "y": 206
       }
     },
     {
@@ -5196,12 +5551,12 @@
       "title": "Events (Loki)",
       "collapsed": false,
       "panels": [],
-      "id": 83,
+      "id": 88,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 197
+        "y": 214
       }
     },
     {
@@ -5257,12 +5612,12 @@
           "queryType": "range"
         }
       ],
-      "id": 84,
+      "id": 89,
       "gridPos": {
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 198
+        "y": 215
       }
     },
     {
@@ -5356,12 +5711,12 @@
           }
         }
       ],
-      "id": 85,
+      "id": 90,
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 205
+        "y": 222
       }
     },
     {
@@ -5520,12 +5875,12 @@
           }
         }
       ],
-      "id": 86,
+      "id": 91,
       "gridPos": {
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 213
+        "y": 230
       }
     },
     {
@@ -5647,12 +6002,12 @@
           }
         }
       ],
-      "id": 87,
+      "id": 92,
       "gridPos": {
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 222
+        "y": 239
       }
     },
     {
@@ -5789,12 +6144,12 @@
           }
         }
       ],
-      "id": 88,
+      "id": 93,
       "gridPos": {
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 232
+        "y": 249
       }
     },
     {
@@ -5802,12 +6157,12 @@
       "title": "Page view traces (Tempo)",
       "collapsed": false,
       "panels": [],
-      "id": 89,
+      "id": 94,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 239
+        "y": 256
       }
     },
     {
@@ -5846,12 +6201,12 @@
           "tableType": "traces"
         }
       ],
-      "id": 90,
+      "id": 95,
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 240
+        "y": 257
       }
     },
     {
@@ -5859,12 +6214,12 @@
       "title": "Long range (recording rules, all page loads)",
       "collapsed": false,
       "panels": [],
-      "id": 91,
+      "id": 96,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 248
+        "y": 265
       }
     },
     {
@@ -5975,12 +6330,12 @@
           "instant": false
         }
       ],
-      "id": 92,
+      "id": 97,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 249
+        "y": 266
       }
     },
     {
@@ -6091,12 +6446,12 @@
           "instant": false
         }
       ],
-      "id": 93,
+      "id": 98,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 249
+        "y": 266
       }
     },
     {
@@ -6207,12 +6562,12 @@
           "instant": false
         }
       ],
-      "id": 94,
+      "id": 99,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 257
+        "y": 274
       }
     },
     {
@@ -6333,12 +6688,12 @@
           "instant": false
         }
       ],
-      "id": 95,
+      "id": 100,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 257
+        "y": 274
       }
     }
   ]
