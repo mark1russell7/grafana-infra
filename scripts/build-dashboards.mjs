@@ -343,6 +343,7 @@ const ANNOTATIONS = [
     annotation("Clock jumps", "lag.clock.jump", { color : "#8f8f8f", title : "Clock {{kind}} {{direction}}", text : "{{magnitude_ms}} ms", tags : "kind" }),
     annotation("Long animation frames", "lag.long_animation_frame", { color : "#b877d9", title : "Long animation frame", text : "{{blocking_duration_ms}} ms blocking, {{script_invoker}}", tags : "script_invoker_type" }),
     annotation("Browser reports", "lag.browser_report", { color : "#5794f2", title : "{{type}}: {{id}}", text : "{{message}}", tags : "type" }),
+    annotation("Long callbacks", "lag.long_callback", { color : "#ff9830", title : "Long callback: {{callback_name}}", text : "{{duration_ms}} ms, {{callback_source}}, operation {{operation}}", tags : "source_kind" }),
 ];
 
 // ---------------------------------------------------------------------------
@@ -479,6 +480,31 @@ metricTable("LoAF attribution: blocking time by script (events)",
         rename : { "Value #A" : "Blocking time", "Value #B" : "Frames", script_invoker_type : "Invoker type", script_invoker : "Invoker", script_source_url : "Script URL" },
         units : { "Value #A" : "ms", "Value #B" : "none" },
         sortBy : "Blocking time",
+    });
+
+row("Long callbacks (LongCallbackMonitor, the add-on @mark1russell7/lag/async-context)");
+timeseries("Long callback duration p50 / p95 / p99",
+    "The duration of each callback of 50 ms or more that the callback hook of async-browser-context measured. Only apps that enable the add-on send it, also from Firefox and Safari, which have no long animation frames.",
+    quantileTargets("lag_long_callback_duration_histogram"), { w : 8 });
+timeseries("Long callback duration p95, by source kind",
+    "The p95 of the long callbacks of each source kind: timer, promise, event, await, observer, stream, lock, frame or other.",
+    [prom(quantile(0.95, "lag_long_callback_duration_histogram", { by : "source_kind" }), "{{source_kind}}")], { w : 8 });
+timeseries("Long callbacks per minute, by source kind",
+    "The number of long callbacks of each source kind, each minute.",
+    [prom(observationsPerMinute("lag_long_callback_duration_histogram", { by : "source_kind" }), "{{source_kind}}")], { unit : "none", w : 8, stack : true, bars : true });
+const longCallbackEvents = events('="lag.long_callback"');
+const callbackLabels = "operation, callback_name, callback_source, source_kind";
+metricTable("Long callbacks by operation and callback (events)",
+    "From the lag.long_callback events: the total time and the number of the long callbacks of each operation and function. The operation comes from a function of the app, for example the name of the active span. The add-on sends at most 10 events each minute for each page.",
+    [
+        lokiInstant(`sum by (${callbackLabels}) (sum_over_time(${longCallbackEvents} | keep ${callbackLabels}, duration_ms | unwrap duration_ms [$__range]))`, ""),
+        lokiInstant(`sum by (${callbackLabels}) (count_over_time(${longCallbackEvents} | keep ${callbackLabels} [$__range]))`, ""),
+    ],
+    {
+        w : 24,
+        rename : { "Value #A" : "Total time", "Value #B" : "Callbacks", operation : "Operation", callback_name : "Callback", callback_source : "Source", source_kind : "Source kind" },
+        units : { "Value #A" : "ms", "Value #B" : "none" },
+        sortBy : "Total time",
     });
 
 row("Event timing (EventTimingMonitor)");

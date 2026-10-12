@@ -15,9 +15,11 @@
  * - The spans go through a TracerProvider with the same resource, as
  *   createOtelSpanSink sends them: one trace for each page view. The root
  *   span lag.page_view ends at the first hide of the view. The hangs, the
- *   stalls, the long animation frames and the hidden and frozen periods are
- *   spans in it, with their real start and end. The lag.page_view.start
- *   event has the trace ID and the span ID of the view.
+ *   stalls, the long animation frames, the long callbacks and the hidden and
+ *   frozen periods are spans in it, with their real start and end. The
+ *   lag.page_view.start event has the trace ID and the span ID of the view.
+ * - The pages with the add-on @mark1russell7/lag/async-context also send
+ *   long callbacks: the metric, the event and the span lag.long_callback.
  * - An abandoned hang is in the trace of the page that hung, with a link to
  *   the view of the page that reported it.
  *
@@ -285,6 +287,21 @@ const SCRIPTS = [
 const PRESSURE_STATES = ["nominal", "fair", "serious", "critical"];
 
 /**
+ * The long callbacks of the add-on @mark1russell7/lag/async-context: the
+ * function, the source (the API that started it), its source kind and the
+ * operation of its context. A callback without an operation started outside
+ * an operation of the app.
+ */
+const LONG_CALLBACKS = [
+    { name : "renderSummary", source : "await", kind : "await", operation : "checkout", medianMs : 120 },
+    { name : "onBuyClick", source : "addEventListener:click", kind : "event", operation : "checkout", medianMs : 90 },
+    { name : "parseCatalog", source : "Promise.then", kind : "promise", operation : "load products", medianMs : 140 },
+    { name : "layoutGrid", source : "requestAnimationFrame", kind : "frame", operation : "load products", medianMs : 70 },
+    { name : "trackImpressions", source : "setTimeout", kind : "timer", medianMs : 60 },
+    { name : "(anonymous)", source : "MutationObserver", kind : "observer", medianMs : 55 },
+];
+
+/**
  * The line of an event, as formatEventLine of the lag library: the name, and
  * the attributes as sorted key=value pairs. A value goes into JSON quotes when
  * it is empty or has a space, a quote or "=".
@@ -296,7 +313,7 @@ function formatEventLine(name, attributes) {
     };
     return [name, ...Object.keys(attributes).sort().map(key => `${key}=${value(attributes[key])}`)].join(" ");
 }
-const ALL_FEATURES = ["loaf", "eventTiming", "memory", "pressure", "liveness", "idle"];
+const ALL_FEATURES = ["loaf", "eventTiming", "memory", "pressure", "liveness", "idle", "longCallbacks"];
 
 /**
  * One profile for each simulated page load. The profiles together use every
@@ -322,7 +339,7 @@ const PROFILES = [
     {
         service : "lag-sample-shop", version : "1.4.2", platform : "Android", mobile : true,
         navigation : "back-forward", startS : 12, lifeS : Infinity, timerMs : 4.0, resolutionMs : 0.1,
-        memorySource : "modern", features : ["loaf", "eventTiming", "memory", "pressure", "idle"], thermals : true,
+        memorySource : "modern", features : ["loaf", "eventTiming", "memory", "pressure", "idle", "longCallbacks"], thermals : true,
         frozen : [58, 60, 70, 72], abandonedHang : { durationMs : 12_400 },
         clockJump : { atS : 45, direction : "forward", kind : "step", magnitudeMs : 850 },
         report : { atS : 14, type : "deprecation" },
@@ -340,10 +357,10 @@ const PROFILES = [
         blur : [20, 25], report : { atS : 20, type : "deprecation" },
     },
     {
-        // Safari: no LoAF, Event Timing, memory, Compute Pressure or idle callbacks.
+        // Safari: no LoAF, Event Timing, memory, Compute Pressure or idle callbacks. The add-on of the long callbacks operates.
         service : "lag-sample-docs", version : "0.9.0", platform : "iOS", mobile : true,
         navigation : "restore", startS : 24, lifeS : Infinity, timerMs : 1.0, resolutionMs : 1,
-        memorySource : undefined, features : [], hidden : [60, 64],
+        memorySource : undefined, features : ["longCallbacks"], hidden : [60, 64],
     },
 ];
 
@@ -851,6 +868,25 @@ class Page {
                 this.emit("lag.long_animation_frame", attributes, startedAt);
                 this.childSpan(S.longAnimationFrame, startedAt, attributes, startedAt + duration);
             }
+        }
+
+        // LongCallbackMonitor (the add-on @mark1russell7/lag/async-context): callbacks of 50 ms or more.
+        // The library sends at most 10 events and spans each minute, and this rate stays below it.
+        if (this.has("longCallbacks") && (chance(0.12) || t === 4)) {
+            const callback = t === 4 ? LONG_CALLBACKS[this.index % LONG_CALLBACKS.length] : pick(LONG_CALLBACKS);
+            const duration = round(50 + lognormal(callback.medianMs - 50, 0.7), 0.1);
+            this.record("longCallbackDuration", duration, { source_kind : callback.kind });
+            const attributes = {
+                duration_ms : duration,
+                "callback.name" : callback.name,
+                "callback.source" : callback.source,
+                source_kind : callback.kind,
+                ...(callback.operation ? { operation : callback.operation } : {}),
+            };
+            // The time of the event and the start of the span is the start of the callback, which ended now
+            const startedAt = Date.now() - duration;
+            this.emit("lag.long_callback", attributes, startedAt);
+            this.childSpan(S.longCallback, startedAt, attributes, startedAt + duration);
         }
 
         // EventTimingMonitor: an interaction about every 3 s.

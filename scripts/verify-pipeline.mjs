@@ -12,6 +12,10 @@
  * 5. Loki has only the index labels service_name and event_name, every
  *    catalog event, the event attributes as structured metadata, and the
  *    worker's own JSON hang report.
+ * 5b. The long callbacks of the add-on: the source_kind label of the
+ *    histogram has only the values of the closed set, and each
+ *    lag.long_callback event has a callback name, a source, a source kind
+ *    and 50 ms or more. Some events have an operation, and some do not.
  * 6. Tempo has one trace for each page view of the sample. The root span
  *    lag.page_view has the view ID, and each other span of the trace has
  *    the root as its parent. The abandoned hang is in the trace of the page
@@ -32,7 +36,7 @@
 
 import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
-import { EVENTS, METRICS, SPANS } from "./lib/lag-catalog.mjs";
+import { CALLBACK_SOURCE_KINDS, EVENTS, METRICS, SPANS } from "./lib/lag-catalog.mjs";
 
 const { values : args } = parseArgs({
     options : {
@@ -290,6 +294,30 @@ async function lokiEvents() {
     const plain = await lokiGet("/loki/api/v1/query_range", { query : `{service_name=~"${serviceRegex}", event_name=""}`, start, end, limit : "5" });
     const plainEntries = (plain.data?.result ?? []).flatMap(s => s.values);
     check(plainEntries.length > 0, `app logs without an event name stay in streams without event_name: ${plainEntries.length} lines, for example "${plainEntries[0]?.[1]}"`);
+}
+
+// ---------------------------------------------------------------------------
+// The long callbacks of the add-on @mark1russell7/lag/async-context
+// ---------------------------------------------------------------------------
+
+async function longCallbacks() {
+    section("Long callbacks: the add-on @mark1russell7/lag/async-context");
+    const window = `${Math.ceil((Date.now() - fromMs) / 60_000) + 1}m`;
+    const series = await promQuery(`count by (source_kind) (last_over_time(lag_long_callback_duration_histogram{service_name=~"${serviceRegex}"}[${window}]))`);
+    const kinds = series.map(s => s.metric.source_kind).sort();
+    check(kinds.length > 0 && kinds.every(kind => CALLBACK_SOURCE_KINDS.includes(kind)),
+        `lag_long_callback_duration_histogram: source_kind ${kinds.join(", ") || "none"}, each one of the closed set`);
+
+    const result = await lokiGet("/loki/api/v1/query_range", {
+        query : `{service_name=~"${serviceRegex}", event_name="lag.long_callback"}`, start : nanos(fromMs), end : nanos(Date.now()), limit : "1000",
+    });
+    const metadata = (result.data?.result ?? []).flatMap(s => s.values).map(v => v[2]?.structuredMetadata ?? {});
+    const wrong = metadata.filter(m => !m.callback_name || !m.callback_source || !CALLBACK_SOURCE_KINDS.includes(m.source_kind) || !(Number(m.duration_ms) >= 50));
+    check(metadata.length > 0 && wrong.length === 0,
+        `lag.long_callback: ${metadata.length} events, each with a callback name, a source, a source kind of the set and 50 ms or more`,
+        wrong.length > 0 ? JSON.stringify(wrong[0]) : undefined);
+    const withOperation = metadata.filter(m => m.operation).length;
+    check(withOperation > 0 && withOperation < metadata.length, `lag.long_callback: ${withOperation} of ${metadata.length} events have an operation (optional)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,6 +668,7 @@ await cors();
 await mimirMetrics();
 await recordingRules();
 await lokiEvents();
+await longCallbacks();
 await tempoTraces();
 await grafanaDashboard();
 

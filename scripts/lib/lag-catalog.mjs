@@ -11,6 +11,9 @@ const LIFECYCLE_TRIGGERS = ["focus", "blur", "visibilitychange", "freeze", "resu
 const INTERACTION_TYPES = ["pointer", "keyboard", "other"];
 const PRESSURE_SOURCES = ["cpu", "thermals", "power", "memory"];
 
+/** The source kinds of the long callbacks (CALLBACK_SOURCE_KINDS of @mark1russell7/lag/async-context). */
+export const CALLBACK_SOURCE_KINDS = ["timer", "promise", "event", "await", "observer", "stream", "lock", "frame", "other"];
+
 export const NAVIGATION_TYPES = [
     "navigate", "reload", "back-forward", "back-forward-cache", "prerender", "restore", "soft-navigation",
 ];
@@ -84,6 +87,9 @@ export const METRICS = [
     metric("browserReports", "lag_browser_reports", "counter", "{report}", { type : ["intervention", "deprecation"] }),
 
     metric("livenessBlock", "lag_liveness_block_histogram", "histogram", "ms"),
+
+    // The add-on @mark1russell7/lag/async-context: only apps that enable it send this metric
+    metric("longCallbackDuration", "lag_long_callback_duration_histogram", "histogram", "ms", { source_kind : CALLBACK_SOURCE_KINDS }),
 ];
 
 /** Metric key to definition. */
@@ -126,6 +132,12 @@ export const EVENTS = [
         attributes : ["source", "state", "previous_state", "lag.page_view.id"],
         optional : ["previous_state"],
     },
+    {
+        // The add-on @mark1russell7/lag/async-context. The operation comes from a function of the app, thus some events have none.
+        name : "lag.long_callback",
+        attributes : ["duration_ms", "callback.name", "callback.source", "source_kind", "operation", "lag.page_view.id"],
+        optional : ["operation"],
+    },
 ];
 
 /**
@@ -155,6 +167,12 @@ export const SPANS = [
     },
     { key : "hidden", name : "lag.page.hidden", attributes : ["trigger"] },
     { key : "frozen", name : "lag.page.frozen", attributes : ["trigger"] },
+    {
+        key : "longCallback",
+        name : "lag.long_callback",
+        attributes : ["duration_ms", "callback.name", "callback.source", "source_kind", "operation"],
+        optional : ["operation"],
+    },
 ];
 
 /** Span key to definition. */
