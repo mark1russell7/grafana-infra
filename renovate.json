@@ -1,0 +1,5 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "The shared settings of mark1russell7 with no automerge (template renovate/base). The Verify checks start the Docker stack and have timing-flaky steps, so a person merges each update.",
+  "extends": ["github>mark1russell7/template//renovate/base"]
+}
