@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>grafana-infra: follow a signal through the real stack</title>
+    <meta name="description" content="Follow metrics, logs, traces and profiles from the browser through Grafana Alloy to Grafana, on the real config files. Then see which panel reads which recording rule, and change a port." />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317192a'/%3E%3Cpath d='M5 21h7l4-10 4 10h7' fill='none' stroke='%23f29a4a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <script>
+      // The saved theme applies before the first paint, so a dark page does not flash white.
+      try {
+        const t = localStorage.getItem("grafana-infra-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#map">Skip to the signal map</a>
+    <header class="top">
+      <div class="brand">
+        <h1 class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>grafana-infra</h1>
+        <p class="lead">A Docker Compose stack for frontend observability. Pick a signal and follow it through the real config files.</p>
+      </div>
+      <nav class="links" aria-label="Site">
+        <a href="#map">Signal map</a>
+        <a href="#dashboards">Dashboards</a>
+        <a href="#ports">Ports</a>
+        <a href="#run">Run it</a>
+        <a href="releases/">Releases</a>
+        <a href="status/">Status</a>
+        <a href="https://github.com/mark1russell7/grafana-infra">GitHub</a>
+        <button type="button" class="theme" id="theme" aria-label="Color theme">Theme: auto</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="map" class="core" aria-labelledby="map-title">
+        <div class="section-head">
+          <h2 id="map-title">Pick a signal</h2>
+          <ul class="facts" id="facts"></ul>
+        </div>
+        <div class="signals" id="signals" role="group" aria-label="Signal"></div>
+        <div class="map-card">
+          <div class="map-wide" id="map-wide"></div>
+          <ol class="map-list" id="map-list"></ol>
+          <p class="route-summary" id="route-summary" aria-live="polite"></p>
+        </div>
+        <div class="detail-card" id="node-detail" aria-live="polite"></div>
+        <p class="note">The stack does not run on this page. The build reads the files of the repository, so each line above is a real line. Pick a node to see its file.</p>
+      </section>
+
+      <section id="dashboards" aria-labelledby="dashboards-title">
+        <div class="section-head">
+          <h2 id="dashboards-title">Which panel reads which rule</h2>
+          <p class="section-lead">The panels stand on their real grid positions. Pick a panel for its query, or a rule for its panels.</p>
+        </div>
+        <div class="tabs" id="board-tabs" role="group" aria-label="Dashboard"></div>
+        <div class="tools">
+          <div class="chips" id="panel-filters" role="group" aria-label="Filter the panels"></div>
+          <label class="search"><span class="sr">Search the panels</span><input id="panel-search" type="search" placeholder="Search titles and queries" autocomplete="off" spellcheck="false" /></label>
+          <button type="button" class="action" id="fit" aria-pressed="false">Whole dashboard</button>
+        </div>
+        <div class="explorer">
+          <div class="board">
+            <div class="grid-scroller" id="grid-scroller" tabindex="0" role="region" aria-label="Panels on the dashboard grid"><div class="panel-grid" id="panel-grid"></div></div>
+            <p class="note" id="panel-count"></p>
+          </div>
+          <div class="explain" id="explain" tabindex="0" role="region" aria-label="The selected panel or rule" aria-live="polite"></div>
+        </div>
+        <div class="matrix-card">
+          <div class="matrix-head-row">
+            <h3>The recording rules of <code>lag.yaml</code></h3>
+            <ul class="key" aria-label="Key">
+              <li><span class="swatch swatch-reads" aria-hidden="true"></span> names the rule</li>
+              <li><span class="swatch swatch-shares" aria-hidden="true"></span> reads the same raw metric</li>
+            </ul>
+          </div>
+          <div class="table-scroller" id="matrix-scroller">
+            <table class="matrix" id="matrix">
+              <thead id="matrix-head"></thead>
+              <tbody id="matrix-body"></tbody>
+            </table>
+          </div>
+          <p class="note" id="matrix-note"></p>
+        </div>
+        <p class="note">No panel here shows a value. These are the definitions of the panels, not measurements.</p>
+      </section>
+
+      <section id="ports" aria-labelledby="ports-title">
+        <div class="section-head">
+          <h2 id="ports-title">Change a port</h2>
+          <p class="section-lead">A change runs the variable substitution of Compose on the real <code>docker-compose.yml</code>. The signal map follows it.</p>
+        </div>
+        <div class="chips" id="presets" role="group" aria-label="Examples"></div>
+        <div class="editor">
+          <div class="fields" id="fields"></div>
+          <div class="impact">
+            <ul class="problems" id="port-problems" hidden></ul>
+            <h3 id="changed-count"></h3>
+            <ul class="diff" id="diff"></ul>
+            <div class="command">
+              <code id="up-command"></code>
+              <button type="button" class="action" data-copy="up-command">Copy</button>
+            </div>
+            <h3>Addresses on your computer</h3>
+            <div class="table-scroller" id="ports-scroller">
+              <table class="ports" id="ports-table">
+                <thead>
+                  <tr><th scope="col">Service</th><th scope="col">From your computer</th><th scope="col">Inside Compose</th></tr>
+                </thead>
+                <tbody id="port-rows"></tbody>
+              </table>
+            </div>
+            <p class="note">Only the host ports change. Inside Compose, the services still use their fixed ports, so <code>config.alloy</code> keeps its addresses.</p>
+            <details class="whole">
+              <summary>The whole resolved Compose file</summary>
+              <pre tabindex="0"><code id="resolved-file"></code></pre>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section id="run" aria-labelledby="run-title">
+        <div class="section-head">
+          <h2 id="run-title">Run it on your computer</h2>
+          <p class="section-lead">These commands use the values above. The sample data comes from <code>scripts/send-sample-data.mjs</code>.</p>
+        </div>
+        <ol class="steps">
+          <li><span>Start the stack</span><code id="run-up"></code></li>
+          <li><span>Send sample data</span><code id="run-sample"></code></li>
+          <li><span>Open Grafana</span><code id="run-open"></code></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span id="build"></span>
+      <a href="https://github.com/mark1russell7/grafana-infra">Source on GitHub</a>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

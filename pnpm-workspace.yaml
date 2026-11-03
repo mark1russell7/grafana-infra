@@ -1,0 +1,11 @@
+# The site of GitHub Pages is a private package of the workspace.
+packages:
+  - "site"
+
+# Packages allowed to run install scripts.
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  # Our own packages: the release train updates them, so the release age check of pnpm does not apply to them.
+  - '@mark1russell7/*'
+  - '@procedures/*'

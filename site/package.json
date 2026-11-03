@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "@grafana-infra/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The GitHub Pages site of grafana-infra: the signal map and the dashboard explorer, read from the real config files.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@mark1russell7/site-pages": "^0.1.10"
+  },
+  "devDependencies": {
+    "@mark1russell7/cue": "^2.0.0",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.3",
+    "yaml": "^2.8.0"
+  }
+}
