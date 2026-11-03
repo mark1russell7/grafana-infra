@@ -1,0 +1,70 @@
+# This workflow builds the project site and publishes it to GitHub Pages.
+# A pull request gets a site check and no deploy.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - site/**
+      - config/**
+      - docker-compose.yml
+      - .env
+      - docs/ROADMAP.md
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/pages.yml
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: read
+  pull-requests: read
+  checks: read
+  statuses: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pages:
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@21c4cb628bc2e0e1be5b21fa92fd3c688400ecab
+    with:
+      build: pnpm --filter @grafana-infra/site run build
+      out: site/dist
+      env: '{"SITE_BASE": "/${{ github.event.repository.name }}"}'
+      deploy: ${{ github.event_name != 'pull_request' }}
+      # The site-pages action adds releases/, status/, data/releases.json and data/status.json to the built site.
+      site-pages: true
+      site-name: grafana-infra
+      roadmap: docs/ROADMAP.md
+      # The check opens each page in a browser at 360, 400 and 1280 pixels, in light and dark.
+      # The probe drives the signal map, the dashboard explorer and the port editor.
+      # The check reads the TypeScript source and removes its types.
+      site-check: true
+      site-check-pages: /,/releases/,/status/
+      site-check-probe: site/src/check-probe.ts
+
+  # This job examines the deployed site: the home page and the pages of site-pages.
+  # It starts no code of the repository and reads only the public site.
+  served:
+    needs: pages
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Examine the public pages
+        env:
+          SITE: https://mark1russell7.github.io/${{ github.event.repository.name }}
+        run: |
+          set -eu
+          for path in "" data/releases.json data/status.json releases/ status/; do
+            curl --fail --silent --show-error --location --retry 5 --retry-delay 10 --retry-all-errors --output /dev/null "$SITE/$path"
+          done

@@ -2,6 +2,8 @@
 
 This repository is a Docker Compose stack for frontend observability. It has Grafana Alloy, Mimir, Loki, Tempo, Pyroscope and Grafana. The lag library uses it for development and integration tests, as the devDependency `@mark1russell7/grafana-infra`. The stack provisions the Lag Monitor dashboard.
 
+The [project site](https://mark1russell7.github.io/grafana-infra/) shows the route of each signal, the panels and rules of the dashboards, and the effect of a port change. It reads the real config files at build time.
+
 ## Components
 
 | Service | Image | Host port | Function |
