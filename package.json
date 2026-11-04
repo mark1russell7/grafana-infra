@@ -9,6 +9,7 @@
   },
   "packageManager": "pnpm@10.26.0",
   "type": "module",
+  "license": "MIT",
   "private": true,
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
