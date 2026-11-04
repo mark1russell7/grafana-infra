@@ -106,7 +106,7 @@ describe("the notice of the run section", () => {
   });
 
   it("stays true for the real files. Change the notice when this test fails", () => {
-    expect(file("../../config/grafana/grafana.ini")).toMatch(/\[auth\.anonymous\]\s+enabled\s*=\s*true\s+org_role\s*=\s*Admin/);
+    expect(file("../../config/grafana/grafana.ini")).toMatch(/\[auth\.anonymous\]\s+enabled\s*=\s*true\s+org_role\s*=\s*Editor/);
     const compose = file("../../docker-compose.yml");
     expect(compose).toContain('"${GRAFANA_PORT:-3000}:3000"');
     expect(compose).toContain("GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}");
