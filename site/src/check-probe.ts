@@ -146,7 +146,7 @@ click("#theme");
 check("the theme button changes the theme", await until(() => document.documentElement.dataset["theme"] !== before), document.documentElement.dataset["theme"]);
 
 const notice = $("#local-only");
-check("the run section says that the stack is for one computer", notice?.textContent?.includes("your own computer") && notice.textContent.includes("Admin role"), notice?.textContent);
+check("the run section says that the stack is for one computer", notice?.textContent?.includes("your own computer") && notice.textContent.includes("Editor role"), notice?.textContent);
 const firstStep = $("#run .steps");
 check("the notice comes before the first command", notice !== null && firstStep !== null && (notice.compareDocumentPosition(firstStep) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
 
