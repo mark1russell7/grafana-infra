@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@21c4cb628bc2e0e1be5b21fa92fd3c688400ecab
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@c8d2f57af6932442af82d2f2223931e47c11beb1 # main
     with:
       build: pnpm --filter @grafana-infra/site run build
       out: site/dist
