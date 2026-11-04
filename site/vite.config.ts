@@ -1,10 +1,7 @@
 import { fileURLToPath } from "node:url";
+import { siteShell } from "@mark1russell7/site-pages/vite";
 import { defineConfig, type Plugin } from "vite";
 import { readSnapshot } from "./src/stack/snapshot.ts";
-
-// The Pages workflow sets SITE_BASE to "/grafana-infra". A local build uses the root.
-const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
-const base = env["SITE_BASE"] ? `${env["SITE_BASE"].replace(/\/$/, "")}/` : "/";
 
 const MODULE = "virtual:stack";
 
@@ -20,10 +17,5 @@ function stackData(): Plugin {
 
 // The site has one page. The deploy adds `status/` and `releases/`.
 export default defineConfig({
-  base,
-  build: { target: "es2022" },
-  plugins: [stackData()],
-  define: {
-    __BUILD__: JSON.stringify({ sha: (env["GITHUB_SHA"] ?? "local").slice(0, 7), date: new Date().toISOString().slice(0, 10) }),
-  },
+  plugins: [siteShell({ themeKey: "grafana-infra-theme", packageFile: false }), stackData()],
 });
