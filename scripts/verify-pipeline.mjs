@@ -59,6 +59,8 @@ const summary = args.summary ? JSON.parse(readFileSync(args.summary, "utf8")) : 
 const services = summary ? [...new Set(summary.pages.map(p => p.service))] : undefined;
 const serviceRegex = services ? services.join("|") : ".+";
 const fromMs = summary ? Date.parse(summary.startedAt) - 60_000 : Date.now() - 30 * 60_000;
+/** The longest wait for the recorded panels: two evaluations of a group, and the delay of the ruler. */
+const RECORDED_WAIT_MS = 180_000;
 // Instant queries (such as "active page loads in the last minute") run at the end of the sample run.
 const toMs = summary ? Math.min(Date.now(), Date.parse(summary.endedAt) + 30_000) : Date.now();
 const auth = `Basic ${Buffer.from(`${args.user}:${args.password}`).toString("base64")}`;
@@ -475,6 +477,14 @@ function substitute(expr) {
         .replaceAll("${session_id:regex}", "");
 }
 
+/** This function tells if each query of a panel has a frame with data. */
+function allHaveData(response, queries) {
+    return queries.every(query => {
+        const result = response.body?.results?.[query.refId];
+        return !result?.error && (result?.frames ?? []).some(frameHasData);
+    });
+}
+
 function frameHasData(frame) {
     const values = frame.data?.values ?? [];
     const fields = frame.schema?.fields ?? [];
@@ -508,6 +518,8 @@ async function grafanaDashboard() {
 
     let current = "";
     const rows = [];
+    const dashboardStart = Date.now();
+    let recordedDeadline;
     for (const panel of dashboard.panels) {
         if (panel.type === "row") {
             current = panel.title;
@@ -531,11 +543,20 @@ async function grafanaDashboard() {
                 maxDataPoints : 300,
             };
         });
-        const response = await getJson(`${args.grafana}/api/ds/query`, {
+        const read = (to) => getJson(`${args.grafana}/api/ds/query`, {
             method : "POST",
             headers,
-            body : JSON.stringify({ queries, from : String(fromMs), to : String(toMs) }),
+            body : JSON.stringify({ queries, from : String(fromMs), to : String(to) }),
         });
+        let response = await read(toMs);
+        if (current.includes("recording rules")) {
+            // The ruler evaluates each group once a minute, so a recorded series can start after the last sample.
+            recordedDeadline ??= Date.now() + RECORDED_WAIT_MS;
+            while (!allHaveData(response, queries) && Date.now() < recordedDeadline) {
+                await new Promise(resolve => setTimeout(resolve, 5_000));
+                response = await read(Date.now());
+            }
+        }
         for (const query of queries) {
             const result = response.body?.results?.[query.refId];
             const frames = result?.frames ?? [];
@@ -547,7 +568,7 @@ async function grafanaDashboard() {
         }
     }
     const good = rows.filter(r => r.ok).length;
-    info(`${good} of ${rows.length} panel queries returned data`);
+    info(`${good} of ${rows.length} panel queries returned data, in ${Math.round((Date.now() - dashboardStart) / 1000)} s`);
 
     // Each annotation layer finds events, and each event line has the fields of its templates
     for (const layer of dashboard.annotations.list.filter(a => !a.builtIn)) {
