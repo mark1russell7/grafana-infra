@@ -98,6 +98,21 @@ describe("the query parser", () => {
   });
 });
 
+describe("the notice of the run section", () => {
+  const file = (relative: string): string => readFileSync(new URL(relative, import.meta.url), "utf8");
+
+  it("is on the page", () => {
+    expect(file("../index.html")).toContain('id="local-only"');
+  });
+
+  it("stays true for the real files. Change the notice when this test fails", () => {
+    expect(file("../../config/grafana/grafana.ini")).toMatch(/\[auth\.anonymous\]\s+enabled\s*=\s*true\s+org_role\s*=\s*Admin/);
+    const compose = file("../../docker-compose.yml");
+    expect(compose).toContain('"${GRAFANA_PORT:-3000}:3000"');
+    expect(compose).toContain("GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}");
+  });
+});
+
 describe("the snapshot of the real files", () => {
   it("has the route of each signal through its real parts", () => {
     const route = (signal: string) => snapshot.routes.find((entry) => entry.signal === signal)!;
