@@ -1,5 +1,5 @@
 // The start of the page: the theme, the facts of the header, the signal map, the dashboard explorer and the port editor.
-import { byId, h, setupTheme } from "@mark1russell7/site-pages/chrome";
+import { byId, h, setupTheme, showBuild } from "@mark1russell7/site-pages/chrome";
 import { setupEditor } from "./editor-view.ts";
 import { setupExplorer } from "./explorer-view.ts";
 import { setupMap } from "./map-view.ts";
@@ -21,4 +21,4 @@ setupMap();
 setupExplorer();
 setupEditor();
 
-byId("build").append(`Build `, __BUILD__.sha === "local" ? "local" : h("a", { href: `https://github.com/mark1russell7/grafana-infra/commit/${__BUILD__.sha}` }, __BUILD__.sha), ` of ${__BUILD__.date}`);
+showBuild(byId("build"), __BUILD__, "mark1russell7/grafana-infra");
