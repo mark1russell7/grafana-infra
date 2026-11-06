@@ -42,8 +42,8 @@ importers:
   site:
     dependencies:
       '@mark1russell7/site-pages':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.4
+        version: 0.3.4
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -81,8 +81,16 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/site-pages@0.2.0':
-    resolution: {integrity: sha512-dahr/WG5PFj/zrcTk/NvufB6N3Tswc60vvGregftq9nraEgeHhaEr+s0zr/gbcOrK7Cz2EHiyO5F2inHc2utYw==}
+  '@mark1russell7/rigor-generators@0.1.6':
+    resolution: {integrity: sha512-eSuVS6nNd2H63dMrfleop+ffBtNd8Ua0/JrcUWUMxf2jHWw432fSwJ+aSa4ecAYq1Pa2ReCfwpqFUP4MII5+GA==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-statistics@0.1.15':
+    resolution: {integrity: sha512-dxr3UiAs64JXV3trXCaTRTesHqXEMUoVvDGIyrz0BWsAZERA/lrIQNUATFAuqnAWzdmbHUyi/5nzA4uPXTSTJw==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/site-pages@0.3.4':
+    resolution: {integrity: sha512-xxYaeElE6/HvADgO+2yu00c7svWw0ICQ99iD/2rYQVTLEvRqn40MDzi0gnCk37/LakH443xwYVvRw/YeZhj4PQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -690,7 +698,15 @@ snapshots:
 
   '@mark1russell7/cue@2.1.1': {}
 
-  '@mark1russell7/site-pages@0.2.0': {}
+  '@mark1russell7/rigor-generators@0.1.6': {}
+
+  '@mark1russell7/rigor-statistics@0.1.15':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.1.6
+
+  '@mark1russell7/site-pages@0.3.4':
+    dependencies:
+      '@mark1russell7/rigor-statistics': 0.1.15
 
   '@opentelemetry/api-logs@0.223.0':
     dependencies:
