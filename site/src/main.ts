@@ -4,6 +4,8 @@ import { setupEditor } from "./editor-view.ts";
 import { setupExplorer } from "./explorer-view.ts";
 import { setupMap } from "./map-view.ts";
 import { snapshot } from "./state.ts";
+// The fade at the edge of a code block that is wider than its box (the class scroll-cue)
+import "@mark1russell7/site-pages/scroll-cue.css";
 import "./style.css";
 
 setupTheme(byId<HTMLButtonElement>("theme"), "grafana-infra-theme");
