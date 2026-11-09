@@ -148,6 +148,17 @@ To find a trace without the dashboard, use this TraceQL query in Explore with th
 { name = "lag.page_view" && resource.service.name = "shop" }
 ```
 
+### Node services: traces, logs and metrics with links
+
+A Node service of the fleet sends its telemetry with `startNodeTelemetry()` of `@mark1russell7/otel-ts/node`: OTLP/HTTP protobuf to Alloy on port 4318 (`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`). The stack keeps the three signals and links them:
+
+- **Log line to trace.** A log record in the context of a span has the trace ID and the span ID. Loki keeps them as the structured metadata `trace_id` and `span_id`. The Loki derived field `Trace` (a label matcher on `trace_id`) shows the link "Open the trace" in Explore. To find the lines of one trace, use `{service_name="<service>"} | trace_id="<trace ID>"`.
+- **Trace to log lines.** In Tempo, "Logs for this span" shows the lines of the trace (`trace_id`), from 1 minute before the span to 1 minute after it. A span with a `service.instance.id` (a lag page load) also shows the lag events of its page load.
+- **Metric to traces.** The metrics generator of Tempo writes the span metrics `traces_spanmetrics_calls_total` and `traces_spanmetrics_latency_bucket` to Mimir, with the label `service`. Their exemplars have the trace ID in the label `traceID`. Mimir keeps exemplars because `max_global_exemplars_per_user` is above 0 (`config/mimir/mimir.yaml`). In a time series panel with exemplars on, a click on an exemplar opens its trace.
+- **Trace to metrics.** Tempo links a span to the metrics of Mimir (`tracesToMetrics`), and the service map of Tempo reads the span metrics.
+
+The stack keeps every span: it has no tail sampling. A sampler before Tempo changes the span metrics, so a later change puts the span metrics in Alloy, before the sampler.
+
 ### Recording rules
 
 The Mimir ruler loads `config/mimir/rules/anonymous/lag.yaml`. The directory name is the tenant. Without multitenancy, the tenant is `anonymous`.
@@ -326,10 +337,16 @@ The Mimir datasource sets `timeInterval` to `15s`, the export interval. Then `$_
    pnpm sample-data --summary sample-summary.json
    ```
 
-4. Verify the pipeline:
+4. Send the data of a sample Node service (20 requests, about 10 seconds):
 
    ```sh
-   pnpm verify --summary sample-summary.json
+   pnpm node-sample-data --summary node-summary.json
+   ```
+
+5. Verify the pipeline:
+
+   ```sh
+   pnpm verify --summary sample-summary.json --node-summary node-summary.json
    ```
 
 `scripts/send-sample-data.mjs` uses the OpenTelemetry JS SDK in the same way as a browser. It simulates six page loads of two services. Each page load has its own `service.instance.id`. The script records each metric of the lag catalog and sends each lag event. It also posts hang reports in the JSON shape of the lag worker, with `fetch` and `keepalive`.
@@ -352,6 +369,9 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - The `lag.page_view.start` events have the trace ID and the span ID of their view.
 - Grafana loads the dashboard, and each panel query and each annotation layer gives data.
 - Grafana reads the traces from Tempo. The Loki derived field and the Trace column link to Tempo.
+- With `--node-summary`, the sample Node service: Tempo has each trace, with the server span and its child span. Each log line in Loki has the `trace_id` and the `span_id` of its request, and LogQL finds the line of one trace. Mimir has the span metrics of the service (with the failed request), exemplars with a trace ID of the sample, and the counter of the service. The Loki datasource links `trace_id` to Tempo, and "Logs for this span" of a span of the service gives only the line of its trace.
+
+`scripts/send-node-service-data.mjs` uses `startNodeTelemetry()` of otel-ts, as a Node service of the fleet does. Each request is a trace: a server span `GET /orders`, a child span `db.query`, and one log line in the context of the server span. The last request fails.
 
 `scripts/screenshot-dashboard.mjs` takes screenshots after the sample data:
 

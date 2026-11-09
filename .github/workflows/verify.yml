@@ -1,8 +1,9 @@
 name: Verify
 
 # The stack end to end: start it, send sample telemetry in the form of the
-# lag library, check every metric, event, trace, panel query and annotation
-# layer, and take screenshots of the dashboard and the traces for review.
+# lag library and of a Node service with otel-ts, check every metric, event,
+# trace, link, panel query and annotation layer, and take screenshots of the
+# dashboard and the traces for review.
 on:
   push:
     branches: [main]
@@ -45,8 +46,10 @@ jobs:
           exit 1
       - name: Send sample data
         run: node scripts/send-sample-data.mjs --summary sample-summary.json
+      - name: Send the data of a sample Node service (otel-ts)
+        run: node scripts/send-node-service-data.mjs --summary node-summary.json
       - name: Verify the pipeline and the dashboard
-        run: node scripts/verify-pipeline.mjs --summary sample-summary.json
+        run: node scripts/verify-pipeline.mjs --summary sample-summary.json --node-summary node-summary.json
       - name: Install Chromium for the screenshots
         if: always()
         run: pnpm exec playwright install --with-deps chromium

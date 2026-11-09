@@ -25,9 +25,16 @@
  *    panel and every annotation layer returns data through the Grafana
  *    datasource API. Grafana reads the traces from Tempo, and the Loki
  *    datasource links lag_page_view_trace_id to Tempo.
+ * 8. With --node-summary (scripts/send-node-service-data.mjs): the Node
+ *    service of the sample. Tempo has each trace. Each log line in Loki has
+ *    the trace ID and the span ID of its request. Mimir has the span metrics
+ *    of Tempo for the service, with exemplars that have the trace IDs, and
+ *    the counter of the service. Grafana links trace_id to Tempo, and a span
+ *    to the logs of its trace.
  *
  * Usage:
  *   node scripts/verify-pipeline.mjs [--summary sample-summary.json]
+ *     [--node-summary node-summary.json]
  *     [--grafana http://localhost:3000] [--user admin --password admin]
  *     [--catalog ../lag/packages/lag/src/metric-catalog.ts]
  *
@@ -41,6 +48,7 @@ import { CALLBACK_SOURCE_KINDS, EVENTS, METRICS, SPANS } from "./lib/lag-catalog
 const { values : args } = parseArgs({
     options : {
         summary : { type : "string" },
+        "node-summary" : { type : "string" },
         grafana : { type : "string", default : process.env.GRAFANA_URL ?? `http://localhost:${process.env.GRAFANA_PORT ?? 3000}` },
         user : { type : "string", default : process.env.GF_SECURITY_ADMIN_USER ?? "admin" },
         password : { type : "string", default : process.env.GF_SECURITY_ADMIN_PASSWORD ?? "admin" },
@@ -56,6 +64,7 @@ const { values : args } = parseArgs({
 });
 
 const summary = args.summary ? JSON.parse(readFileSync(args.summary, "utf8")) : undefined;
+const nodeSummary = args["node-summary"] ? JSON.parse(readFileSync(args["node-summary"], "utf8")) : undefined;
 const services = summary ? [...new Set(summary.pages.map(p => p.service))] : undefined;
 const serviceRegex = services ? services.join("|") : ".+";
 const fromMs = summary ? Date.parse(summary.startedAt) - 60_000 : Date.now() - 30 * 60_000;
@@ -622,6 +631,92 @@ async function grafanaTraceLinks(dashboard, headers) {
 }
 
 // ---------------------------------------------------------------------------
+// The Node service of the sample (C9 of otel-ts)
+// ---------------------------------------------------------------------------
+
+/** Poll `read` until `done` holds for its value, or until `ms` ends. It gives the last value. */
+async function poll(read, done, ms) {
+    const deadline = Date.now() + ms;
+    let value = await read();
+    while (!done(value) && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 3_000));
+        value = await read();
+    }
+    return value;
+}
+
+async function nodeService(headers) {
+    const service = nodeSummary.service;
+    section(`The Node service ${service}: traces, logs, span metrics and exemplars`);
+    const start = nanos(Date.parse(nodeSummary.startedAt) - 60_000);
+    const end = nanos(Date.parse(nodeSummary.endedAt) + 120_000);
+    const traceIds = new Set(nodeSummary.traces.map(t => t.traceId));
+
+    // Tempo: each trace, with the server span and the query span, in the service
+    let incomplete = [];
+    for (const sent of nodeSummary.traces) {
+        const spans = await poll(() => tempoSpans(sent.traceId), list => list.length >= 2, 30_000);
+        const server = spans.find(span => span.spanId === sent.spanId);
+        const query = spans.find(span => span.name === "db.query");
+        if (!server || server.resource["service.name"] !== service || query?.parentSpanId !== sent.spanId) incomplete.push(sent.traceId);
+    }
+    check(incomplete.length === 0, `Tempo has the ${nodeSummary.traces.length} traces of ${service}, each with GET /orders and its child db.query`,
+        incomplete.length ? `not complete: ${incomplete.join(", ")}` : undefined);
+
+    // Loki: each line has the trace ID and the span ID of its request (the link from a log line to its trace)
+    const entriesOf = (result) => (result.data?.result ?? []).flatMap(stream => stream.values);
+    const read = () => lokiGet("/loki/api/v1/query_range", { query : `{service_name="${service}"}`, start, end, limit : "500" });
+    const entries = entriesOf(await poll(read, result => entriesOf(result).length >= nodeSummary.traces.length, 60_000));
+    incomplete = nodeSummary.traces.filter(sent => !entries.some(([, line, meta]) =>
+        line === sent.line && meta?.structuredMetadata?.trace_id === sent.traceId && meta?.structuredMetadata?.span_id === sent.spanId));
+    check(incomplete.length === 0, `Loki has the ${nodeSummary.traces.length} log lines of ${service}, each with the trace_id and the span_id of its request`,
+        incomplete.length ? `missing or without the ids: ${incomplete.map(t => t.line).join(", ")}; for example ${JSON.stringify(entries[0])}` : undefined);
+    const lookup = await lokiGet("/loki/api/v1/query_range", { query : `{service_name="${service}"} | trace_id="${nodeSummary.traces[0].traceId}"`, start, end, limit : "10" });
+    check(entriesOf(lookup).length === 1, `LogQL finds the line of one trace with | trace_id="...": ${entriesOf(lookup).length} line`);
+
+    // Mimir: the span metrics of Tempo, with exemplars that have the trace IDs (the link from a metric to its traces)
+    const total = (result) => Number(result[0]?.value?.[1] ?? 0);
+    const calls = await poll(() => promQuery(`sum(traces_spanmetrics_calls_total{service="${service}"})`), result => total(result) > 0, 120_000);
+    check(total(calls) > 0, `Mimir has the span metrics of Tempo for ${service}: traces_spanmetrics_calls_total = ${total(calls)}`);
+    const errors = await promQuery(`sum(traces_spanmetrics_calls_total{service="${service}", status_code="STATUS_CODE_ERROR"})`);
+    check(total(errors) > 0, `the span metrics count the failed request: ${total(errors)} calls with STATUS_CODE_ERROR`);
+    const exemplarsOf = async () => {
+        const url = new URL(`${args.mimir}/prometheus/api/v1/query_exemplars`);
+        url.searchParams.set("query", `traces_spanmetrics_latency_bucket{service="${service}"}`);
+        url.searchParams.set("start", String(Date.parse(nodeSummary.startedAt) / 1000 - 60));
+        url.searchParams.set("end", String(Date.now() / 1000 + 60));
+        const { body } = await getJson(url);
+        return (Array.isArray(body?.data) ? body.data : []).flatMap(series => series.exemplars ?? []);
+    };
+    const exemplars = await poll(exemplarsOf, list => list.length > 0, 60_000);
+    const linked = exemplars.filter(e => traceIds.has(e.labels?.traceID ?? e.labels?.trace_id));
+    check(linked.length > 0, `Mimir keeps the exemplars of the span metrics: ${exemplars.length} exemplars, ${linked.length} with a trace ID of the sample`,
+        exemplars.length ? `for example ${JSON.stringify(exemplars[0])}` : "max_global_exemplars_per_user must be above 0 (config/mimir/mimir.yaml)");
+
+    // Mimir: the counter of the service, with service_name from the promoted resource attribute
+    const counter = await poll(() => promQuery(`sum({__name__=~"sample_node_requests(_total)?", service_name="${service}"})`), result => total(result) >= nodeSummary.requests, 60_000);
+    check(total(counter) === nodeSummary.requests, `Mimir has the counter sample_node_requests of ${service}: ${total(counter)} of ${nodeSummary.requests}`);
+
+    // Grafana: a log line opens its trace, and a span opens the logs of its trace
+    const loki = await getJson(`${args.grafana}/api/datasources/uid/loki`, { headers });
+    const field = loki.body?.jsonData?.derivedFields?.find(f => f.matcherType === "label" && f.matcherRegex === "trace_id");
+    check(field?.datasourceUid === "tempo", `the Loki datasource has a derived field from trace_id to Tempo: ${JSON.stringify(field)}`);
+    const tempo = await getJson(`${args.grafana}/api/datasources/uid/tempo`, { headers });
+    const logsQuery = tempo.body?.jsonData?.tracesToLogsV2?.query ?? "";
+    check(logsQuery.includes("trace_id=") && logsQuery.includes("service_instance_id="), `"Logs for this span" finds the lines of the trace and the lag events of the page load: ${logsQuery}`);
+    // The query as Grafana fills it for a span of the sample, which has no service.instance.id: Loki must parse it, and it gives only the line of the trace
+    const sent = nodeSummary.traces[0];
+    const filled = logsQuery
+        .replaceAll('${__span.tags["service.name"]}', service)
+        .replaceAll("${__trace.traceId}", sent.traceId)
+        .replaceAll('${__span.tags["service.instance.id"]}', "");
+    const forSpan = await lokiGet("/loki/api/v1/query_range", { query : filled, start, end, limit : "10" });
+    const lines = entriesOf(forSpan).map(([, line]) => line);
+    check(forSpan.status === "success" && lines.length === 1 && lines[0] === sent.line, `"Logs for this span" of a span of ${service} gives only the line of its trace: ${JSON.stringify(lines)}`,
+        forSpan.status === "success" ? undefined : JSON.stringify(forSpan));
+}
+
+// ---------------------------------------------------------------------------
 // Optional: compare the catalog copy with the TypeScript catalog
 // ---------------------------------------------------------------------------
 
@@ -692,6 +787,7 @@ await lokiEvents();
 await longCallbacks();
 await tempoTraces();
 await grafanaDashboard();
+if (nodeSummary) await nodeService({ Authorization : auth });
 
 console.log(`\n${failures === 0 ? "All checks passed" : `${failures} checks failed`} (${results.length} checks).`);
 process.exitCode = failures === 0 ? 0 : 1;

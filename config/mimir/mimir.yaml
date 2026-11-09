@@ -94,5 +94,12 @@ limits:
   # The default ingestion rate (10,000 samples/s) is sufficient:
   # 330 open pages x 100 series / 15 s export interval = 2,200 samples/s.
 
+  # Keeps the exemplars of the span metrics of Tempo (config/tempo/tempo.yaml,
+  # send_exemplars), so a metric panel links to its traces. The JS metrics SDK
+  # records no exemplars, so the span metrics are the link from a metric to a
+  # trace (roadmap C9 and C16 of otel-ts). The default, 0, drops each exemplar.
+  # The value is the size of the in-memory ring of exemplars of the tenant.
+  max_global_exemplars_per_user: 100000
+
   # Do not enable otel_native_delta_ingestion. Browsers export cumulative
   # temporality, and delta ingestion is experimental.

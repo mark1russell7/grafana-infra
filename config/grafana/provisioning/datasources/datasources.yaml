@@ -27,6 +27,15 @@ datasources:
           url: "$${__value.raw}"
           datasourceUid: tempo
           matcherType: regex
+        # A log record in the context of a span (each Node service of the fleet,
+        # with otel-ts) has the trace ID. Loki keeps it as the structured
+        # metadata trace_id, so a log line opens its trace.
+        - name: Trace
+          matcherRegex: trace_id
+          url: "$${__value.raw}"
+          datasourceUid: tempo
+          matcherType: label
+          urlDisplayLabel: Open the trace
         # The lag.page_view.start event has the trace ID of its page view. Loki
         # keeps it as the structured metadata lag_page_view_trace_id. A label
         # matcher reads it, thus Explore shows a link to the trace in Tempo.
@@ -45,15 +54,18 @@ datasources:
     jsonData:
       tracesToMetrics:
         datasourceUid: mimir
-      # "Logs for this span": the lag events of the same page load, from 1 minute
-      # before the span to 1 minute after it. Loki keeps service.name as the
-      # label service_name, and service.instance.id as structured metadata.
+      # "Logs for this span", from 1 minute before the span to 1 minute after it:
+      # the lines of the trace (a Node service writes them with the trace_id),
+      # and the lag events of the same page load (the same service.instance.id).
+      # Loki keeps service.name as the label service_name, and trace_id and
+      # service.instance.id as structured metadata. A span with no
+      # service.instance.id matches only by the trace.
       tracesToLogsV2:
         datasourceUid: loki
         spanStartTimeShift: "-1m"
         spanEndTimeShift: "1m"
         customQuery: true
-        query: '{service_name="$${__span.tags["service.name"]}"} | service_instance_id="$${__span.tags["service.instance.id"]}"'
+        query: '{service_name="$${__span.tags["service.name"]}"} | trace_id="$${__trace.traceId}" or (service_instance_id="$${__span.tags["service.instance.id"]}" and service_instance_id!="")'
       nodeGraph:
         enabled: true
       serviceMap:
