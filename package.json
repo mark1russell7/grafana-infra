@@ -4,6 +4,7 @@
   "description": "Docker Compose Grafana stack (Alloy, Mimir, Loki, Tempo, Grafana) with the lag dashboards",
   "scripts": {
     "sample-data": "node scripts/send-sample-data.mjs",
+    "node-sample-data": "node scripts/send-node-service-data.mjs",
     "dashboards": "node scripts/build-dashboards.mjs",
     "verify": "node scripts/verify-pipeline.mjs"
   },
@@ -12,6 +13,7 @@
   "license": "MIT",
   "private": true,
   "devDependencies": {
+    "@mark1russell7/otel-ts": "^0.6.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.223.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.223.0",
@@ -20,6 +22,7 @@
     "@opentelemetry/resources": "^2.12.0",
     "@opentelemetry/sdk-logs": "^0.223.0",
     "@opentelemetry/sdk-metrics": "^2.12.0",
+    "@opentelemetry/sdk-node": "^0.223.0",
     "@opentelemetry/sdk-trace-base": "^2.12.0",
     "playwright": "1.58.2"
   }
