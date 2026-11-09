@@ -4,13 +4,10 @@
  */
 
 import { HIDDEN, isSecretName, parseDotEnv, references } from "./compose-vars.ts";
+import { escapeRegExp as escaped } from "@mark1russell7/text";
 
 const ASSIGNMENT = /(?<![A-Za-z0-9_.{-])([A-Za-z0-9_.-]*(?:PASSWORD|SECRET|TOKEN)[A-Za-z0-9_.-]*)(\s*[=:]\s*)(?!\$\{)("[^"]*"|'[^']*'|[^\s#]+)/gi;
 const WITH_OPERAND = /\$\{([A-Za-z_][A-Za-z0-9_]*)(:-|-|:\+|\+|:\?|\?)([^}]*)\}/g;
-
-function escaped(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 /** This function gives the secret values of the files: the values in `.env`, and the defaults in `${NAME:-default}` forms. */
 export function secretValues(texts: readonly string[]): string[] {
