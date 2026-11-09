@@ -11,6 +11,9 @@ importers:
       '@mark1russell7/otel-ts':
         specifier: ^0.6.0
         version: 0.6.0(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
+      '@mark1russell7/rigor-generators':
+        specifier: ^0.1.8
+        version: 0.1.8
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -226,6 +229,10 @@ packages:
 
   '@mark1russell7/rigor-generators@0.1.6':
     resolution: {integrity: sha512-eSuVS6nNd2H63dMrfleop+ffBtNd8Ua0/JrcUWUMxf2jHWw432fSwJ+aSa4ecAYq1Pa2ReCfwpqFUP4MII5+GA==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-generators@0.1.8':
+    resolution: {integrity: sha512-6AC/YQdSrMKs/1NcHesjmmxVjKrqTDXjzKaElE8N8TgsqgiApCbsnk5xRoGJfvIJZUX7vJHFB9F+w48OSdRtHQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.15':
@@ -1431,6 +1438,8 @@ snapshots:
       - zone.js
 
   '@mark1russell7/rigor-generators@0.1.6': {}
+
+  '@mark1russell7/rigor-generators@0.1.8': {}
 
   '@mark1russell7/rigor-statistics@0.1.15':
     dependencies:
