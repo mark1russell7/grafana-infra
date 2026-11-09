@@ -119,7 +119,13 @@ describe("the snapshot of the real files", () => {
     expect(route("metrics").nodes).toEqual(expect.arrayContaining(["service:mimir", "grafana"]));
     expect(route("logs").nodes).toContain("service:loki");
     expect(route("traces").nodes).toContain("service:tempo");
-    expect(route("traces").branch?.nodes).toContain("service:mimir");
+    // The span metrics and the service graph leave the receiver before the tail sampler, and go to Mimir
+    expect(route("traces").nodes).toContain("otelcol.processor.tail_sampling.default");
+    expect(route("traces").branches.map((branch) => [branch.from, branch.nodes[0], branch.nodes.includes("service:mimir")])).toEqual([
+      ["otelcol.receiver.otlp.default", "otelcol.connector.spanmetrics.default", true],
+      ["otelcol.receiver.otlp.default", "otelcol.connector.servicegraph.default", true],
+    ]);
+    expect(snapshot.spanMetrics.file).toBe("config/alloy/config.alloy");
     expect(route("profiles").gap).not.toBeNull();
     for (const entry of snapshot.routes) expect(entry.nodes.at(-1)).toBe("grafana");
   });
@@ -188,6 +194,8 @@ describe("the links between panels and rules", () => {
 
 describe("the port editor", () => {
   const base = baseValues(snapshot.variables);
+  /** The line of the port of Grafana in the real Compose file, from 1 */
+  const grafanaPortLine = compose.findIndex((line) => line.includes('"${GRAFANA_PORT:-3000}:3000"')) + 1;
 
   it("starts with no change", () => {
     const impact = impactOf(compose, snapshot.variables, base);
@@ -200,13 +208,14 @@ describe("the port editor", () => {
   it("changes the real line of a port", () => {
     const impact = impactOf(compose, snapshot.variables, { ...base, GRAFANA_PORT: "3300" });
     expect(impact.compose).toHaveLength(1);
-    expect(impact.compose[0]).toMatchObject({ line: 106 });
+    expect(grafanaPortLine).toBeGreaterThan(0);
+    expect(impact.compose[0]).toMatchObject({ line: grafanaPortLine });
     expect(impact.compose[0]!.after).toContain('"3300:3000"');
     expect(impact.command).toBe("GRAFANA_PORT=3300 docker compose up -d");
   });
 
   it("uses the default of Compose for an empty value", () => {
-    const line = hostPorts(compose, { ...base, GRAFANA_PORT: "" }).find((port) => port.line === 106);
+    const line = hostPorts(compose, { ...base, GRAFANA_PORT: "" }).find((port) => port.line === grafanaPortLine);
     expect(line?.host).toBe("3000");
   });
 

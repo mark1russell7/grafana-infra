@@ -90,6 +90,10 @@ services:
       - /etc/alloy/config.alloy
       - --storage.path=/var/lib/alloy/data
       - --server.http.listen-addr=0.0.0.0:12345
+    environment:
+      # The tail sampler keeps this percent of the traces with no error and
+      # no slow span (config/alloy/config.alloy). 100 keeps each trace.
+      - TRACE_SAMPLE_PERCENT=${TRACE_SAMPLE_PERCENT:-100}
     depends_on:
       - mimir
       - loki

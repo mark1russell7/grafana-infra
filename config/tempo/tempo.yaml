@@ -16,25 +16,16 @@ storage:
     wal:
       path: /var/tempo/wal
 
+# The span metrics and the service graph come from Alloy, before its tail
+# sampler (config/alloy/config.alloy). Here they would count only the traces
+# that the sampler keeps. The generator keeps only local-blocks: the TraceQL
+# metrics queries of Grafana (rate(), quantile_over_time()) read its blocks.
 metrics_generator:
-  registry:
-    external_labels:
-      source: tempo
-      cluster: docker-compose
   storage:
     path: /var/tempo/generator/wal
-    remote_write:
-      - url: http://mimir:9009/api/v1/push
-        send_exemplars: true
   traces_storage:
     path: /var/tempo/generator/traces
   processor:
-    service_graphs:
-      dimensions:
-        - service.name
-    span_metrics:
-      dimensions:
-        - service.name
     local_blocks:
       flush_to_storage: true
 
@@ -42,6 +33,4 @@ overrides:
   defaults:
     metrics_generator:
       processors:
-        - service-graphs
-        - span-metrics
         - local-blocks

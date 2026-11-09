@@ -38,8 +38,18 @@ export interface MapEdge {
   readonly signals: readonly Signal[];
   /** A real value of the hop, for example the endpoint. */
   readonly label: string;
-  /** True for a hop of a second route: the span metrics of Tempo. */
+  /** True for a hop of a second route: for example the span metrics that a connector of Alloy makes from the traces. */
   readonly branch: boolean;
+}
+
+/** A second route of a signal: a connector of Alloy gives another signal, which goes to another backend. */
+export interface Branch {
+  /** The node that the second route leaves from. */
+  readonly from: string;
+  /** The nodes of the second route, in order, from the connector to Grafana. */
+  readonly nodes: readonly string[];
+  /** What the second route carries, for example "Span metrics". */
+  readonly label: string;
 }
 
 /** The route of one signal. */
@@ -47,8 +57,8 @@ export interface Route {
   readonly signal: Signal;
   /** The nodes of the main route, in order. */
   readonly nodes: readonly string[];
-  /** A second route, with the node that it leaves from. */
-  readonly branch: { readonly from: string; readonly nodes: readonly string[]; readonly label: string } | null;
+  /** The second routes, one for each connector on the main route. */
+  readonly branches: readonly Branch[];
   /** The UID of the data source of Grafana. */
   readonly datasource: string;
   /** The reason when the route does not go through Alloy. */
@@ -152,7 +162,7 @@ export interface Snapshot {
   readonly datasources: readonly DataSource[];
   readonly rules: readonly Rule[];
   readonly dashboards: readonly Dashboard[];
-  /** The lines of `tempo.yaml` that write the span metrics to Mimir. */
+  /** The lines of `config.alloy` that make the span metrics from the traces. */
   readonly spanMetrics: Source;
   /** The number of Compose services. */
   readonly services: number;

@@ -48,18 +48,22 @@ browser (OpenTelemetry JS SDK)
   │  OTLP/HTTP, JSON or protobuf, port 4318
   ▼
 Alloy: otelcol.receiver.otlp (CORS for localhost pages)
-  ├─ metrics ──────────────────────────────► batch ──► Mimir  /otlp/v1/metrics
-  ├─ logs ──► transform (event name, line) ──► batch ──► Loki   /otlp/v1/logs
-  └─ traces ───────────────────────────────► batch ──► Tempo  OTLP/gRPC
+  ├─ metrics ─────────────────────────────────────────► batch ──► Mimir  /otlp/v1/metrics
+  ├─ logs ──► transform (event name, line) ───────────► batch ──► Loki   /otlp/v1/logs
+  └─ traces ─┬─► span metrics ──┐
+             ├─► service graph ─┴─► transform (names) ─► batch ──► Mimir  /otlp/v1/metrics
+             └─► tail sampler ────────────────────────► batch ──► Tempo  OTLP/gRPC
 ```
 
-Alloy keeps no state. A restart of Alloy loses no metric data, because browsers export cumulative values. Traces go to `/v1/traces` on the same port, as metrics and logs.
+A restart of Alloy loses no metric data of a browser, because browsers export cumulative values. A restart resets the counters of the span metrics, and `rate()` handles the reset. Traces go to `/v1/traces` on the same port, as metrics and logs.
 
 ### Alloy
 
 - The OTLP receiver accepts OTLP/HTTP (JSON and protobuf) on port 4318 and OTLP/gRPC on port 4317.
 - Pages on `localhost` and `127.0.0.1` can post, on all ports, through HTTP or HTTPS.
 - The receiver answers the CORS preflight. It echoes the page origin and lets the page send credentials.
+- The connectors `otelcol.connector.spanmetrics` and `otelcol.connector.servicegraph` make the span metrics and the service graph from each span, before the tail sampler. A transform gives them the names and the labels of the metrics generator of Tempo, so the dashboards and the service map of Grafana read the same series.
+- The tail sampler `otelcol.processor.tail_sampling` decides on each trace 5 seconds after its first span. It keeps each trace with an error, each trace of 2 seconds or more, and `TRACE_SAMPLE_PERCENT` percent of the other traces (`.env`, default 100: it keeps each trace).
 - The lag worker sends hang reports with `fetch(url, { keepalive: true })` and a JSON body. This request gets a preflight, and the receiver accepts it.
 - `navigator.sendBeacon` with a JSON body also works.
 - To accept a different origin, add it to `allowed_origins` in `config/alloy/config.alloy`.
@@ -154,10 +158,10 @@ A Node service of the fleet sends its telemetry with `startNodeTelemetry()` of `
 
 - **Log line to trace.** A log record in the context of a span has the trace ID and the span ID. Loki keeps them as the structured metadata `trace_id` and `span_id`. The Loki derived field `Trace` (a label matcher on `trace_id`) shows the link "Open the trace" in Explore. To find the lines of one trace, use `{service_name="<service>"} | trace_id="<trace ID>"`.
 - **Trace to log lines.** In Tempo, "Logs for this span" shows the lines of the trace (`trace_id`), from 1 minute before the span to 1 minute after it. A span with a `service.instance.id` (a lag page load) also shows the lag events of its page load.
-- **Metric to traces.** The metrics generator of Tempo writes the span metrics `traces_spanmetrics_calls_total` and `traces_spanmetrics_latency_bucket` to Mimir, with the label `service`. Their exemplars have the trace ID in the label `traceID`. Mimir keeps exemplars because `max_global_exemplars_per_user` is above 0 (`config/mimir/mimir.yaml`). In a time series panel with exemplars on, a click on an exemplar opens its trace.
-- **Trace to metrics.** Tempo links a span to the metrics of Mimir (`tracesToMetrics`), and the service map of Tempo reads the span metrics.
+- **Metric to traces.** Alloy makes the span metrics `traces_spanmetrics_calls_total` and `traces_spanmetrics_latency_bucket` and writes them to Mimir, with the labels `service` and `service_name`. These are the names of the metrics generator of Tempo. Their exemplars have the trace ID in the label `trace_id`. Mimir keeps exemplars because `max_global_exemplars_per_user` is above 0 (`config/mimir/mimir.yaml`). In a time series panel with exemplars on, a click on an exemplar opens its trace.
+- **Trace to metrics.** Tempo links a span to the metrics of Mimir (`tracesToMetrics`), and the service map of Tempo reads the service graph series `traces_service_graph_request_total` and its histograms.
 
-The stack keeps every span: it has no tail sampling. A sampler before Tempo changes the span metrics, so a later change puts the span metrics in Alloy, before the sampler.
+Alloy counts each span before its tail sampler, so the span metrics stay exact when the sampler drops traces. The metrics generator of Tempo sees only the kept traces, so it makes no span metrics here. It keeps only `local-blocks`, for the TraceQL metrics queries of Grafana.
 
 ### Recording rules
 
@@ -369,7 +373,7 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - The `lag.page_view.start` events have the trace ID and the span ID of their view.
 - Grafana loads the dashboard, and each panel query and each annotation layer gives data.
 - Grafana reads the traces from Tempo. The Loki derived field and the Trace column link to Tempo.
-- With `--node-summary`, the sample Node service: Tempo has each trace, with the server span and its child span. Each log line in Loki has the `trace_id` and the `span_id` of its request, and LogQL finds the line of one trace. Mimir has the span metrics of the service (with the failed request), exemplars with a trace ID of the sample, and the counter of the service. The Loki datasource links `trace_id` to Tempo, and "Logs for this span" of a span of the service gives only the line of its trace.
+- With `--node-summary`, the sample Node service: Tempo has each trace, with the server span and its child span. Each log line in Loki has the `trace_id` and the `span_id` of its request, and LogQL finds the line of one trace. Mimir has the span metrics of the service from Alloy (with the failed request, no `instance` label, and no series of Tempo), exemplars with a trace ID of the sample, and the counter of the service. The Loki datasource links `trace_id` to Tempo, and "Logs for this span" of a span of the service gives only the line of its trace.
 
 `scripts/send-node-service-data.mjs` uses `startNodeTelemetry()` of otel-ts, as a Node service of the fleet does. Each request is a trace: a server span `GET /orders`, a child span `db.query`, and one log line in the context of the server span. The last request fails.
 
@@ -384,6 +388,8 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - `explore-loki-trace-link.png`: a `lag.page_view.start` event in Explore, with the link to its trace.
 
 The CI workflow `.github/workflows/verify.yml` does all of this on each pull request: it starts the stack, sends the sample data, verifies the pipeline and uploads the screenshots as the artifact `dashboard-screenshots`.
+
+The workflow then checks the tail sampler. It starts Alloy again with `TRACE_SAMPLE_PERCENT=0`, sends a second Node sample with `--service sample-node-service-sampled`, and runs `verify-pipeline.mjs --sampled-summary`. Tempo must have the trace of the failed request and no other trace of the sample. The span metrics must count each request.
 
 If Grafana uses a different port, add `--grafana http://localhost:3300`. To compare `scripts/lib/lag-catalog.mjs` with the lag catalog (metrics, events and spans), add `--catalog ../lag/packages/lag/src/metric-catalog.ts`.
 
