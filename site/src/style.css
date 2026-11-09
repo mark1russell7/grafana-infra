@@ -679,6 +679,11 @@ pre {
   background: var(--surface);
 }
 
+/* The background of the cue in a browser with no scroll timelines (the class scroll-cue of site-pages) */
+pre.scroll-cue {
+  --scroll-cue-bg: var(--surface);
+}
+
 pre code {
   display: block;
   width: max-content;

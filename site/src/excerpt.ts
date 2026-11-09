@@ -27,7 +27,7 @@ export function excerpt(source: Source): HTMLElement {
     ),
     h(
       "pre",
-      { tabindex: 0, "aria-label": `${source.file}, ${where}` },
+      { class: "scroll-cue", tabindex: 0, "aria-label": `${source.file}, ${where}` },
       h(
         "code",
         {},
