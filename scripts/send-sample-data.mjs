@@ -44,6 +44,7 @@ import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { BasicTracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
+import { mulberry32 } from "@mark1russell7/rigor-generators";
 import { M, METRICS, S, VITAL_THRESHOLDS } from "./lib/lag-catalog.mjs";
 
 const { values : args } = parseArgs({
@@ -64,19 +65,8 @@ const EXPORT_INTERVAL_MS = Number(args.interval) * 1000;
 const PAGE_ORIGIN = "http://localhost:5173";
 
 // ---------------------------------------------------------------------------
-// Random numbers (seeded, so that runs are reproducible)
+// Random numbers (seeded, so that runs are reproducible; mulberry32 of rigor-generators)
 // ---------------------------------------------------------------------------
-
-function mulberry32(seed) {
-    let a = seed >>> 0;
-    return () => {
-        a = (a + 0x6D2B79F5) >>> 0;
-        let t = a;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 const rnd = mulberry32(Number(args.seed));
 const uniform = (a, b) => a + (b - a) * rnd();
