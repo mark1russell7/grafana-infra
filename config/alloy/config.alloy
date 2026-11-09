@@ -1,12 +1,18 @@
 // =============================================================================
 // Grafana Alloy: OTLP from browsers to Mimir, Loki and Tempo
 //
-//   otelcol.receiver.otlp ──► metrics ──────────────────────► batch ──► Mimir
-//                         ├─► logs ────► transform.event_name ► batch ──► Loki
-//                         └─► traces ─────────────────────────► batch ──► Tempo
+//   otelcol.receiver.otlp ──► metrics ───────────────────────────► batch ──► Mimir
+//                         ├─► logs ──► transform.event_name ──────► batch ──► Loki
+//                         └─► traces ─┬► connector.spanmetrics ──┐
+//                                     ├► connector.servicegraph ─┴► transform.span_metrics ► batch ──► Mimir
+//                                     └► processor.tail_sampling ──────────────────────────► batch ──► Tempo
 //
-// All components are generally available. Alloy keeps no state, so a restart
-// loses nothing: browsers export cumulative metrics.
+// The span metrics and the service graph count each span before the tail
+// sampler, so they stay exact when the sampler drops traces.
+//
+// All components are generally available. Browsers export cumulative
+// metrics, so a restart of Alloy loses no metric of a browser. A restart
+// resets the counters of the span metrics, and rate() handles the reset.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -45,7 +51,147 @@ otelcol.receiver.otlp "default" {
   output {
     metrics = [otelcol.processor.batch.default.input]
     logs    = [otelcol.processor.transform.event_name.input]
-    traces  = [otelcol.processor.batch.default.input]
+    traces  = [
+      otelcol.connector.spanmetrics.default.input,
+      otelcol.connector.servicegraph.default.input,
+      otelcol.processor.tail_sampling.default.input,
+    ]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Span metrics: the calls and the latency of each span, before the sampler.
+//
+// The dimensions are the defaults: service.name, span.name, span.kind and
+// status.code. Each browser page load has its own service.instance.id, so the
+// resource key is only service.name: one set of series for each service, not
+// for each page load. The exemplars have the trace ID, so a latency panel
+// links to its traces. The buckets are the defaults of the metrics generator
+// of Tempo, in seconds.
+// -----------------------------------------------------------------------------
+otelcol.connector.spanmetrics "default" {
+  namespace                       = "traces.spanmetrics"
+  metrics_flush_interval          = "15s"
+  resource_metrics_key_attributes = ["service.name"]
+  // More attribute sets than this go to one series with otel.metric.overflow="true"
+  aggregation_cardinality_limit = 5000
+
+  histogram {
+    unit = "s"
+
+    explicit {
+      buckets = ["2ms", "4ms", "8ms", "16ms", "32ms", "64ms", "128ms", "256ms", "512ms", "1024ms", "2048ms", "4096ms", "8192ms", "16384ms"]
+    }
+  }
+
+  exemplars {
+    enabled = true
+  }
+
+  output {
+    metrics = [otelcol.processor.transform.span_metrics.input]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Service graph: the requests between two services, from the pairs of client
+// and server spans, before the sampler. Grafana draws the service map of the
+// Tempo data source from these series.
+// -----------------------------------------------------------------------------
+otelcol.connector.servicegraph "default" {
+  metrics_flush_interval = "15s"
+
+  output {
+    metrics = [otelcol.processor.transform.span_metrics.input]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// The names and the labels of the metrics generator of Tempo, so the
+// dashboards and the service map of Grafana read the same series as before.
+// Mimir adds no unit or _total suffix (config/mimir/mimir.yaml), so these
+// statements set the full names.
+//
+// 1. The resource keeps only service.name. Mimir makes it the labels job and
+//    service_name. No series gets the instance of one page load.
+// 2. Each point gets the label service, as the span metrics of Tempo have.
+// 3. The names of Tempo: traces_spanmetrics_calls_total,
+//    traces_spanmetrics_latency (Mimir adds _bucket, _sum and _count), and
+//    the _seconds names of the service graph histograms.
+// -----------------------------------------------------------------------------
+otelcol.processor.transform "span_metrics" {
+  error_mode = "ignore"
+
+  metric_statements {
+    context    = "resource"
+    statements = [
+      `keep_keys(resource.attributes, ["service.name"])`,
+    ]
+  }
+
+  metric_statements {
+    context    = "datapoint"
+    statements = [
+      `set(datapoint.attributes["service"], resource.attributes["service.name"]) where resource.attributes["service.name"] != nil`,
+    ]
+  }
+
+  metric_statements {
+    context    = "metric"
+    statements = [
+      `set(metric.name, "traces_spanmetrics_calls_total") where metric.name == "traces.spanmetrics.calls"`,
+      `set(metric.name, "traces_spanmetrics_latency") where metric.name == "traces.spanmetrics.duration"`,
+      `set(metric.name, "traces_service_graph_request_server_seconds") where metric.name == "traces_service_graph_request_server"`,
+      `set(metric.name, "traces_service_graph_request_client_seconds") where metric.name == "traces_service_graph_request_client"`,
+    ]
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Tail sampler. It decides for each trace 5 s after the first span of the
+// trace. It keeps each trace with an error, each trace of 2 s or more (the
+// page views of the browsers are often long), and TRACE_SAMPLE_PERCENT
+// percent of the other traces. The default, 100, keeps each trace. CI sets 0
+// to check that the sampler drops the traces with no error, and that the span
+// metrics still count their spans (scripts/verify-pipeline.mjs
+// --sampled-summary).
+// -----------------------------------------------------------------------------
+otelcol.processor.tail_sampling "default" {
+  decision_wait = "5s"
+
+  policy {
+    name = "errors"
+    type = "status_code"
+
+    status_code {
+      status_codes = ["ERROR"]
+    }
+  }
+
+  policy {
+    name = "slow"
+    type = "latency"
+
+    latency {
+      threshold_ms = 2000
+    }
+  }
+
+  policy {
+    name = "sample"
+    type = "probabilistic"
+
+    probabilistic {
+      sampling_percentage = encoding.from_json(coalesce(sys.env("TRACE_SAMPLE_PERCENT"), "100"))
+    }
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
   }
 }
 

@@ -248,7 +248,7 @@ function ruleExplanation(panel: Panel): HTMLElement {
       "div",
       { class: "feeds", id: "feeds" },
       h("h4", {}, "No recording rule feeds this panel"),
-      h("p", {}, "Tempo makes these series from the traces, and it writes them to Mimir. These lines send them."),
+      h("p", {}, "Alloy makes these series from the traces, before its tail sampler, and writes them to Mimir. These lines make them."),
       excerpt(snapshot.spanMetrics),
     );
   }

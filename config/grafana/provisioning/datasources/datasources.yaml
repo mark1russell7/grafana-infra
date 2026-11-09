@@ -11,8 +11,10 @@ datasources:
       httpMethod: POST
       # The browser export interval. $__rate_interval is then at least 4 x 15 s.
       timeInterval: 15s
+      # Mimir stores the trace ID of an OTLP exemplar in the label trace_id.
+      # The span metrics of Alloy have such exemplars (config/alloy/config.alloy).
       exemplarTraceIdDestinations:
-        - name: traceID
+        - name: trace_id
           datasourceUid: tempo
 
   - name: Loki

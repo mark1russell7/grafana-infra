@@ -14,13 +14,18 @@
  * - Tempo has each trace, with the service name of the sample;
  * - each log line in Loki has the trace ID and the span ID of its request
  *   (the link from a log line to its trace);
- * - Mimir has the span metrics of Tempo for the service, with exemplars that
+ * - Mimir has the span metrics of Alloy for the service, with exemplars that
  *   have the trace IDs (the link from a metric to its traces);
  * - Mimir has the counter of the service.
+ *
+ * With --service, a second sample has its own series. CI sends one with the
+ * tail sampler of Alloy at TRACE_SAMPLE_PERCENT=0 (verify-pipeline.mjs
+ * --sampled-summary).
  *
  * Usage:
  *   node scripts/send-node-service-data.mjs [--summary node-summary.json]
  *     [--otlp http://localhost:4318] [--requests 20]
+ *     [--service sample-node-service]
  */
 
 import { parseArgs } from "node:util";
@@ -31,11 +36,12 @@ const { values : args } = parseArgs({
         summary : { type : "string" },
         otlp : { type : "string", default : process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? `http://localhost:${process.env.OTLP_HTTP_PORT ?? 4318}` },
         requests : { type : "string", default : "20" },
+        service : { type : "string", default : "sample-node-service" },
     },
 });
 
 /** The service name of the sample. The checks of verify-pipeline.mjs read it from the summary. */
-const SERVICE_NAME = "sample-node-service";
+const SERVICE_NAME = args.service;
 
 // The OTLP exporters read their endpoint from the environment, so set it before the start
 process.env.OTEL_EXPORTER_OTLP_ENDPOINT = args.otlp;

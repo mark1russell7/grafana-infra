@@ -6,11 +6,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isMap, isSeq, LineCounter, parseDocument, type Document, type Node, type Pair, type ParsedNode } from "yaml";
-import { components, hostOf, parseAlloy, walk, type AlloyBlock, type AlloyComponent } from "./alloy.ts";
+import { components, hostOf, isConnector, parseAlloy, walk, type AlloyBlock, type AlloyComponent } from "./alloy.ts";
 import { isSecretName, parseDotEnv, references } from "./compose-vars.ts";
 import { seriesOf } from "./promql.ts";
 import { redactLines, secretValues } from "./redact.ts";
-import { SIGNALS, type Dashboard, type DataSource, type FileText, type MapEdge, type MapNode, type Panel, type PanelTarget, type Route, type Rule, type Signal, type Snapshot, type Source, type StackVariable } from "./types.ts";
+import { SIGNALS, type Branch, type Dashboard, type DataSource, type FileText, type MapEdge, type MapNode, type Panel, type PanelTarget, type Route, type Rule, type Signal, type Snapshot, type Source, type StackVariable } from "./types.ts";
 
 const COMPOSE = "docker-compose.yml";
 const ENV = ".env";
@@ -27,12 +27,15 @@ const DASHBOARDS = ["config/grafana/provisioning/dashboards/lag-monitor.json", "
 const BACKEND_PARTS: Readonly<Record<string, { readonly file: string; readonly paths: readonly (readonly string[])[] }>> = {
   mimir: { file: MIMIR, paths: [["server"], ["ruler"], ["ruler_storage"]] },
   loki: { file: LOKI, paths: [["server"], ["limits_config", "otlp_config"]] },
-  tempo: { file: TEMPO, paths: [["server"], ["distributor"], ["metrics_generator", "storage"]] },
+  tempo: { file: TEMPO, paths: [["server"], ["distributor"], ["metrics_generator"]] },
 };
 
 const COMPONENT_TITLES: readonly (readonly [RegExp, string])[] = [
   [/^otelcol\.receiver\.otlp\./, "OTLP receiver"],
   [/^otelcol\.processor\.transform\./, "Transform"],
+  [/^otelcol\.processor\.tail_sampling\./, "Tail sampler"],
+  [/^otelcol\.connector\.spanmetrics\./, "Span metrics"],
+  [/^otelcol\.connector\.servicegraph\./, "Service graph"],
   [/^otelcol\.processor\.batch\./, "Batch"],
   [/^otelcol\.exporter\.otlphttp\./, "OTLP/HTTP exporter"],
   [/^otelcol\.exporter\.otlp\./, "OTLP exporter"],
@@ -95,6 +98,14 @@ function attribute(block: AlloyBlock, name: string): string {
   const found = block.attributes.find((entry) => entry.name === name);
   if (found === undefined) throw new Error(`${ALLOY}: ${block.name} has no attribute ${name}.`);
   return found.raw.replace(/^"|"$/g, "");
+}
+
+/** This function gives the count of the statements of a transform, with their kind: `2 log statements`. */
+function statementsText(block: AlloyBlock): string | undefined {
+  const parts = block.blocks.filter((entry) => entry.name.endsWith("_statements"));
+  if (parts.length === 0) return undefined;
+  const count = parts.reduce((sum, part) => sum + (part.attributes.find((entry) => entry.name === "statements")?.raw.match(/`/g)?.length ?? 0) / 2, 0);
+  return `${count} ${parts[0]!.name.replace(/_statements$/, "")} statements`;
 }
 
 function componentTitle(component: AlloyComponent): string {
@@ -295,13 +306,11 @@ export function readSnapshot(root: string): Snapshot {
   const httpPort = attribute(httpBlock, "endpoint").split(":").at(-1)!;
   const grpcPort = attribute(grpcBlock, "endpoint").split(":").at(-1)!;
 
-  const tempoYaml = yamlOf(TEMPO, read(TEMPO));
-  const tempoJs = tempoYaml.doc.toJS() as { metrics_generator: { storage: { remote_write: readonly { url: string }[] } } };
-  const spanTarget = tempoJs.metrics_generator.storage.remote_write[0]?.url;
-  if (spanTarget === undefined) throw new Error(`${TEMPO}: no remote_write.`);
-  const spanMetrics = linesAt(tempoYaml, ["metrics_generator", "storage", "remote_write"], "Tempo writes the span metrics to Mimir");
+  const spanConnector = pipeline.find((component) => component.id.startsWith("otelcol.connector.spanmetrics."));
+  if (spanConnector === undefined) throw new Error(`${ALLOY}: no otelcol.connector.spanmetrics.`);
+  const spanMetrics = blockSource(spanConnector.block, "Alloy makes the span metrics from the traces, before the tail sampler");
 
-  const backendYamls: Record<string, Yaml> = { tempo: tempoYaml };
+  const backendYamls: Record<string, Yaml> = {};
   for (const [service, part] of Object.entries(BACKEND_PARTS)) backendYamls[service] ??= yamlOf(part.file, read(part.file));
 
   const backendSources = (service: string): Source[] => {
@@ -375,6 +384,58 @@ export function readSnapshot(root: string): Snapshot {
     mergeEdge(edges, { from: `source:${host}`, to: "grafana", signals: [signal], label: `The data source ${source.name}`, branch: false });
   };
 
+  /** The rows of the connectors in the column of the receiver: over it and under it. */
+  const connectorRows = new Map<string, number>();
+  const placeOf = (component: AlloyComponent, signal: Signal): { column: number; row: number } => {
+    if (component.id === receiver.id) return { column: 1, row: 1 };
+    if (component.endpoint !== undefined) return { column: 4, row: ROW_OF_SIGNAL[signal] };
+    if (component.id.startsWith("otelcol.processor.batch.")) return { column: 3, row: 1 };
+    if (isConnector(component.id)) {
+      if (!connectorRows.has(component.id)) connectorRows.set(component.id, [0, 2, 3][connectorRows.size] ?? connectorRows.size + 1);
+      return { column: 1, row: connectorRows.get(component.id)! };
+    }
+    return { column: 2, row: ROW_OF_SIGNAL[signal] };
+  };
+  const detailOf = (component: AlloyComponent): string => {
+    if (component.endpoint !== undefined) return component.endpoint;
+    if (component.id === receiver.id) return `:${httpPort} HTTP, :${grpcPort} gRPC`;
+    const statements = statementsText(component.block);
+    if (statements !== undefined) return statements;
+    const policies = component.block.blocks.filter((entry) => entry.name === "policy").length;
+    if (policies > 0) return `${policies} policies, wait ${attribute(component.block, "decision_wait")}`;
+    if (isConnector(component.id)) return `flush every ${attribute(component.block, "metrics_flush_interval")}`;
+    return `timeout ${attribute(component.block, "timeout")}, batch ${attribute(component.block, "send_batch_size")}`;
+  };
+  const addComponent = (id: string, signal: Signal): AlloyComponent => {
+    const component = pipeline.find((entry) => entry.id === id);
+    if (component === undefined) throw new Error(`${ALLOY}: an output goes to ${id}, which does not exist.`);
+    addNode({ id, title: componentTitle(component), name: componentName(component), detail: detailOf(component), ...placeOf(component, signal), sources: [blockSource(component.block, componentName(component))] });
+    return component;
+  };
+
+  /** The second routes of a signal: each connector on its route gives another signal, to another backend. */
+  const branchesOf = (route: readonly string[], signal: Signal): Branch[] =>
+    route.flatMap((id) =>
+      (pipeline.find((entry) => entry.id === id)!.outputs[signal] ?? []).filter(isConnector).map((target): Branch => {
+        const connector = addComponent(target, signal);
+        const output = SIGNALS.find((entry) => connector.outputs[entry] !== undefined);
+        if (output === undefined) throw new Error(`${ALLOY}: ${componentName(connector)} has no output.`);
+        const steps = walk(pipeline, target, output);
+        steps.forEach((step, index) => {
+          addComponent(step, output);
+          mergeEdge(edges, { from: index === 0 ? id : steps[index - 1]!, to: step, signals: [signal], label: index === 0 ? signal : output, branch: true });
+        });
+        const exporter = pipeline.find((entry) => entry.id === steps.at(-1))!;
+        if (exporter.endpoint === undefined) throw new Error(`${ALLOY}: the ${output} of ${componentName(connector)} reach no exporter.`);
+        const host = hostOf(exporter.endpoint);
+        addBackend(host, output, new URL(dataSourceOfHost(host).url).port);
+        mergeEdge(edges, { from: exporter.id, to: `service:${host}`, signals: [signal], label: exporter.endpoint, branch: false });
+        mergeEdge(edges, { from: `service:${host}`, to: `source:${host}`, signals: [signal], label: "", branch: false });
+        mergeEdge(edges, { from: `source:${host}`, to: "grafana", signals: [signal], label: "", branch: false });
+        return { from: id, nodes: [...steps, `service:${host}`, `source:${host}`, "grafana"], label: componentTitle(connector) };
+      }),
+    );
+
   const routes: Route[] = [];
   for (const signal of SIGNALS) {
     const route = walk(pipeline, receiver.id, signal);
@@ -387,7 +448,7 @@ export function readSnapshot(root: string): Snapshot {
       routes.push({
         signal,
         nodes: [`service:${host}`, `source:${host}`, "grafana"],
-        branch: null,
+        branches: [],
         datasource: source.uid,
         gap: {
           text: `The output block of ${componentName(receiver)} has lines for ${Object.keys(receiver.outputs).join(", ")}. It has no line for ${signal}, so ${signal} never go through Alloy.`,
@@ -397,26 +458,7 @@ export function readSnapshot(root: string): Snapshot {
       continue;
     }
     route.forEach((id, index) => {
-      const component = pipeline.find((entry) => entry.id === id)!;
-      const isExporter = component.endpoint !== undefined;
-      const column = index === 0 ? 1 : isExporter ? 4 : id.includes(".transform.") ? 2 : 3;
-      const isTransform = column === 2;
-      const detail = isExporter
-        ? component.endpoint!
-        : index === 0
-          ? `:${httpPort} HTTP, :${grpcPort} gRPC`
-          : isTransform
-            ? `${(child(component.block, "log_statements").attributes.find((entry) => entry.name === "statements")?.raw.match(/`/g)?.length ?? 0) / 2} log statements`
-            : `timeout ${attribute(component.block, "timeout")}, batch ${attribute(component.block, "send_batch_size")}`;
-      addNode({
-        id,
-        title: componentTitle(component),
-        name: componentName(component),
-        detail,
-        column,
-        row: isExporter ? ROW_OF_SIGNAL[signal] : isTransform ? 2 : 1,
-        sources: [blockSource(component.block, componentName(component))],
-      });
+      addComponent(id, signal);
       if (index > 0) mergeEdge(edges, { from: route[index - 1]!, to: id, signals: [signal], label: signal, branch: false });
     });
     mergeEdge(edges, { from: "browser", to: receiver.id, signals: [signal], label: `OTLP to localhost:${portOf("alloy", httpPort)}`, branch: false });
@@ -426,14 +468,7 @@ export function readSnapshot(root: string): Snapshot {
     addBackend(host, signal, container);
     mergeEdge(edges, { from: exporter.id, to: `service:${host}`, signals: [signal], label: exporter.endpoint ?? "", branch: false });
     const source = dataSourceOfHost(host);
-    const spanHost = hostOf(spanTarget);
-    const branch = BACKEND_PARTS[host]?.file === TEMPO ? { from: `service:${host}`, nodes: [`service:${spanHost}`, `source:${spanHost}`, "grafana"], label: spanTarget } : null;
-    if (branch !== null) {
-      mergeEdge(edges, { from: branch.from, to: `service:${spanHost}`, signals: [signal], label: spanTarget, branch: true });
-      mergeEdge(edges, { from: `service:${spanHost}`, to: `source:${spanHost}`, signals: [signal], label: "", branch: false });
-      mergeEdge(edges, { from: `source:${spanHost}`, to: "grafana", signals: [signal], label: "", branch: false });
-    }
-    routes.push({ signal, nodes: ["browser", ...route, `service:${host}`, `source:${host}`, "grafana"], branch, datasource: source.uid, gap: null });
+    routes.push({ signal, nodes: ["browser", ...route, `service:${host}`, `source:${host}`, "grafana"], branches: branchesOf(route, signal), datasource: source.uid, gap: null });
   }
 
   const secrets = secretValues([envText, composeText]);

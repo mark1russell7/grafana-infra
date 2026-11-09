@@ -50,6 +50,23 @@ jobs:
         run: node scripts/send-node-service-data.mjs --summary node-summary.json
       - name: Verify the pipeline and the dashboard
         run: node scripts/verify-pipeline.mjs --summary sample-summary.json --node-summary node-summary.json
+      # The tail sampler of Alloy at 0 percent: Tempo keeps only the traces with
+      # an error, and the span metrics still count each request
+      - name: Restart Alloy with TRACE_SAMPLE_PERCENT=0
+        shell: bash
+        run: |
+          TRACE_SAMPLE_PERCENT=0 docker compose up -d alloy
+          docker compose exec -T alloy printenv TRACE_SAMPLE_PERCENT | grep -qx 0
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:12345/-/ready; then exit 0; fi
+            sleep 2
+          done
+          echo "Alloy did not become ready in 2 minutes" >&2
+          exit 1
+      - name: Send a Node sample through the sampler
+        run: node scripts/send-node-service-data.mjs --service sample-node-service-sampled --summary node-summary-sampled.json
+      - name: Verify the tail sampler
+        run: node scripts/verify-pipeline.mjs --sampled-summary node-summary-sampled.json
       - name: Install Chromium for the screenshots
         if: always()
         run: pnpm exec playwright install --with-deps chromium

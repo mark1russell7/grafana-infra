@@ -32,7 +32,7 @@ function live(text: string): string {
 }
 
 function onRoute(route: Route): Set<string> {
-  return new Set([...route.nodes, ...(route.branch?.nodes ?? [])]);
+  return new Set([...route.nodes, ...route.branches.flatMap((branch) => branch.nodes)]);
 }
 
 function nodeTop(node: MapNode): number {
@@ -72,11 +72,12 @@ function gapButton(extra: string): HTMLButtonElement {
   return button;
 }
 
-function edgePath(from: MapNode, to: MapNode, branch: boolean): string {
+function edgePath(from: MapNode, to: MapNode): string {
   const y = (node: MapNode) => nodeTop(node) + NODE_HEIGHT / 2;
   const x = (node: MapNode) => nodeLeft(node.column) * (VIEW_WIDTH / 100);
   const width = NODE_WIDTH * (VIEW_WIDTH / 100);
-  if (branch) return `M ${x(from)} ${y(from)} C ${x(from) - 22} ${y(from)}, ${x(to) - 22} ${y(to)}, ${x(to)} ${y(to)}`;
+  // A hop in one column, for example from the receiver to a connector, curves out on the left side
+  if (from.column === to.column) return `M ${x(from)} ${y(from)} C ${x(from) - 22} ${y(from)}, ${x(to) - 22} ${y(to)}, ${x(to)} ${y(to)}`;
   const startX = x(from) + width;
   const middle = (startX + x(to)) / 2;
   return `M ${startX} ${y(from)} C ${middle} ${y(from)}, ${middle} ${y(to)}, ${x(to)} ${y(to)}`;
@@ -94,7 +95,7 @@ function drawWide(root: HTMLElement): void {
   for (const edge of snapshot.edges) {
     if (edge.to === "grafana") continue;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", edgePath(nodes.get(edge.from)!, nodes.get(edge.to)!, edge.branch));
+    path.setAttribute("d", edgePath(nodes.get(edge.from)!, nodes.get(edge.to)!));
     path.setAttribute("data-signals", edge.signals.join(" "));
     path.classList.add("edge");
     if (edge.branch) path.classList.add("edge-branch");
@@ -126,11 +127,10 @@ function drawList(root: HTMLElement): void {
     const label = index === 0 ? "" : hop(route.nodes[index - 1], id);
     items.push(h("li", {}, label === "" ? null : h("span", { class: "hop", "data-live": label }, ""), nodeButton(nodes.get(id)!, "")));
   });
-  if (route.branch !== null) {
-    const branch = route.branch;
-    items.push(h("li", { class: "branch-head" }, `Second route, from ${nodes.get(branch.from)!.title}`));
+  for (const branch of route.branches) {
+    items.push(h("li", { class: "branch-head" }, `Second route: ${branch.label}, from ${nodes.get(branch.from)!.title}`));
     branch.nodes.forEach((id, index) => {
-      const label = index === 0 ? branch.label : hop(branch.nodes[index - 1], id);
+      const label = hop(index === 0 ? branch.from : branch.nodes[index - 1], id);
       items.push(h("li", {}, label === "" ? null : h("span", { class: "hop", "data-live": label }, ""), nodeButton(nodes.get(id)!, "")));
     });
   }
@@ -216,8 +216,8 @@ function drawPicker(root: HTMLElement): void {
 function summary(route: Route): string {
   const stations = route.nodes.map((id) => nodes.get(id)!.title);
   const main = `${SIGNAL_TEXT[route.signal]}: ${stations.join(", then ")}.`;
-  if (route.branch === null) return main;
-  return `${main} A second route leaves ${nodes.get(route.branch.from)!.title}: the span metrics go to ${route.branch.label}.`;
+  const second = route.branches.map((branch) => `${branch.label} leaves ${nodes.get(branch.from)!.title}: ${branch.nodes.map((id) => nodes.get(id)!.title).join(", then ")}.`);
+  return [main, ...second].join(" ");
 }
 
 /** This function starts the map. */

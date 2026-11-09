@@ -165,7 +165,16 @@ export function components(blocks: readonly AlloyBlock[]): AlloyComponent[] {
   });
 }
 
-/** This function gives the components that a signal goes through from a start component, in order, or an empty list. */
+/** This function tells if a component is a connector: it takes one signal and gives another, for example traces to metrics. */
+export function isConnector(id: string): boolean {
+  return id.startsWith("otelcol.connector.");
+}
+
+/**
+ * This function gives the components that a signal goes through from a start component, in order, or an empty list.
+ * When an output has more than one target, the route goes on to the first target that is not a connector: a connector
+ * starts a second route, of another signal.
+ */
 export function walk(all: readonly AlloyComponent[], start: string, signal: string): string[] {
   const route: string[] = [];
   const byId = new Map(all.map((component) => [component.id, component]));
@@ -173,7 +182,7 @@ export function walk(all: readonly AlloyComponent[], start: string, signal: stri
   if (current?.outputs[signal] === undefined) return route;
   while (current !== undefined && !route.includes(current.id)) {
     route.push(current.id);
-    const next: string | undefined = current.outputs[signal]?.[0];
+    const next: string | undefined = current.outputs[signal]?.find((target) => !isConnector(target));
     current = next === undefined ? undefined : byId.get(next);
   }
   return route;

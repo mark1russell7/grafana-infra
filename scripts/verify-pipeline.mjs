@@ -28,13 +28,18 @@
  * 8. With --node-summary (scripts/send-node-service-data.mjs): the Node
  *    service of the sample. Tempo has each trace. Each log line in Loki has
  *    the trace ID and the span ID of its request. Mimir has the span metrics
- *    of Tempo for the service, with exemplars that have the trace IDs, and
- *    the counter of the service. Grafana links trace_id to Tempo, and a span
- *    to the logs of its trace.
+ *    of Alloy for the service, with exemplars that have the trace IDs, and
+ *    the counter of the service. No span metric comes from Tempo. Grafana
+ *    links trace_id to Tempo, and a span to the logs of its trace.
+ * 9. With --sampled-summary, and no other check: a second Node sample, sent
+ *    with the tail sampler of Alloy at TRACE_SAMPLE_PERCENT=0. Tempo has each
+ *    trace with an error and no other trace. The span metrics count each
+ *    request: the connectors of Alloy count the spans before the sampler.
  *
  * Usage:
  *   node scripts/verify-pipeline.mjs [--summary sample-summary.json]
  *     [--node-summary node-summary.json]
+ *   node scripts/verify-pipeline.mjs --sampled-summary node-summary-sampled.json
  *     [--grafana http://localhost:3000] [--user admin --password admin]
  *     [--catalog ../lag/packages/lag/src/metric-catalog.ts]
  *
@@ -49,6 +54,7 @@ const { values : args } = parseArgs({
     options : {
         summary : { type : "string" },
         "node-summary" : { type : "string" },
+        "sampled-summary" : { type : "string" },
         grafana : { type : "string", default : process.env.GRAFANA_URL ?? `http://localhost:${process.env.GRAFANA_PORT ?? 3000}` },
         user : { type : "string", default : process.env.GF_SECURITY_ADMIN_USER ?? "admin" },
         password : { type : "string", default : process.env.GF_SECURITY_ADMIN_PASSWORD ?? "admin" },
@@ -65,6 +71,7 @@ const { values : args } = parseArgs({
 
 const summary = args.summary ? JSON.parse(readFileSync(args.summary, "utf8")) : undefined;
 const nodeSummary = args["node-summary"] ? JSON.parse(readFileSync(args["node-summary"], "utf8")) : undefined;
+const sampledSummary = args["sampled-summary"] ? JSON.parse(readFileSync(args["sampled-summary"], "utf8")) : undefined;
 const services = summary ? [...new Set(summary.pages.map(p => p.service))] : undefined;
 const serviceRegex = services ? services.join("|") : ".+";
 const fromMs = summary ? Date.parse(summary.startedAt) - 60_000 : Date.now() - 30 * 60_000;
@@ -674,10 +681,17 @@ async function nodeService(headers) {
     const lookup = await lokiGet("/loki/api/v1/query_range", { query : `{service_name="${service}"} | trace_id="${nodeSummary.traces[0].traceId}"`, start, end, limit : "10" });
     check(entriesOf(lookup).length === 1, `LogQL finds the line of one trace with | trace_id="...": ${entriesOf(lookup).length} line`);
 
-    // Mimir: the span metrics of Tempo, with exemplars that have the trace IDs (the link from a metric to its traces)
+    // Mimir: the span metrics of Alloy, with exemplars that have the trace IDs (the link from a metric to its traces)
     const total = (result) => Number(result[0]?.value?.[1] ?? 0);
     const calls = await poll(() => promQuery(`sum(traces_spanmetrics_calls_total{service="${service}"})`), result => total(result) > 0, 120_000);
-    check(total(calls) > 0, `Mimir has the span metrics of Tempo for ${service}: traces_spanmetrics_calls_total = ${total(calls)}`);
+    check(total(calls) > 0, `Mimir has the span metrics of Alloy for ${service}: traces_spanmetrics_calls_total = ${total(calls)}`);
+    // The metrics generator of Tempo labelled its series with source="tempo". Alloy counts before its tail sampler, Tempo after it.
+    const fromTempo = await promQuery(`count({__name__=~"traces_spanmetrics_.+|traces_service_graph_.+", source="tempo"})`);
+    check(total(fromTempo) === 0, `no span metric comes from Tempo: ${total(fromTempo)} series with source="tempo"`);
+    const labels = await promQuery(`traces_spanmetrics_calls_total{service="${service}"}`);
+    const perPageLoad = labels.filter(series => series.metric?.instance !== undefined);
+    check(labels.length > 0 && perPageLoad.length === 0, `the span metrics of ${service} have no instance label: ${labels.length} series, ${perPageLoad.length} with an instance`,
+        perPageLoad.length ? JSON.stringify(perPageLoad[0].metric) : undefined);
     const errors = await promQuery(`sum(traces_spanmetrics_calls_total{service="${service}", status_code="STATUS_CODE_ERROR"})`);
     check(total(errors) > 0, `the span metrics count the failed request: ${total(errors)} calls with STATUS_CODE_ERROR`);
     const exemplarsOf = async () => {
@@ -714,6 +728,39 @@ async function nodeService(headers) {
     const lines = entriesOf(forSpan).map(([, line]) => line);
     check(forSpan.status === "success" && lines.length === 1 && lines[0] === sent.line, `"Logs for this span" of a span of ${service} gives only the line of its trace: ${JSON.stringify(lines)}`,
         forSpan.status === "success" ? undefined : JSON.stringify(forSpan));
+}
+
+/** The checks of a Node sample sent with the tail sampler at TRACE_SAMPLE_PERCENT=0 */
+async function sampledService() {
+    const service = sampledSummary.service;
+    const failed = sampledSummary.traces.filter(t => t.failed);
+    const others = sampledSummary.traces.filter(t => !t.failed);
+    section(`The tail sampler of Alloy at TRACE_SAMPLE_PERCENT=0: ${service}`);
+    const total = (result) => Number(result[0]?.value?.[1] ?? 0);
+
+    // The span metrics count each request, also the requests of the traces that the sampler drops
+    const requests = `sum(traces_spanmetrics_calls_total{service="${service}", span_name="GET /orders"})`;
+    const counted = await poll(() => promQuery(requests), result => total(result) >= sampledSummary.requests, 120_000);
+    check(total(counted) === sampledSummary.requests,
+        `the span metrics count each request of ${service}, before the sampler: ${total(counted)} of ${sampledSummary.requests}`);
+    const errors = await promQuery(`sum(traces_spanmetrics_calls_total{service="${service}", span_name="GET /orders", status_code="STATUS_CODE_ERROR"})`);
+    check(total(errors) === failed.length, `the span metrics count the failed requests: ${total(errors)} of ${failed.length}`);
+
+    // Tempo: the sampler keeps each trace with an error
+    const missing = [];
+    for (const sent of failed) {
+        const spans = await poll(() => tempoSpans(sent.traceId), list => list.length >= 2, 60_000);
+        if (spans.length < 2) missing.push(sent.traceId);
+    }
+    check(missing.length === 0, `Tempo has the ${failed.length} traces with an error`, missing.length ? `missing: ${missing.join(", ")}` : undefined);
+
+    // Tempo: the sampler drops the other traces. The sender exports all the spans at its stop, so the
+    // sampler decides on each trace at about the same time. The wait gives the batch and Tempo some time.
+    await new Promise(resolve => setTimeout(resolve, 10_000));
+    const kept = [];
+    for (const sent of others) if ((await tempoSpans(sent.traceId)).length > 0) kept.push(sent.traceId);
+    check(kept.length === 0, `Tempo has none of the ${others.length} traces with no error: the sampler dropped ${others.length - kept.length}`,
+        kept.length ? `kept: ${kept.join(", ")}` : undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -778,16 +825,22 @@ function compareCatalog(path) {
 
 // ---------------------------------------------------------------------------
 
-if (args.catalog) compareCatalog(args.catalog);
-await readiness();
-await cors();
-await mimirMetrics();
-await recordingRules();
-await lokiEvents();
-await longCallbacks();
-await tempoTraces();
-await grafanaDashboard();
-if (nodeSummary) await nodeService({ Authorization : auth });
+if (sampledSummary) {
+    // A second run, after the first one, with Alloy at TRACE_SAMPLE_PERCENT=0
+    await readiness();
+    await sampledService();
+} else {
+    if (args.catalog) compareCatalog(args.catalog);
+    await readiness();
+    await cors();
+    await mimirMetrics();
+    await recordingRules();
+    await lokiEvents();
+    await longCallbacks();
+    await tempoTraces();
+    await grafanaDashboard();
+    if (nodeSummary) await nodeService({ Authorization : auth });
+}
 
 console.log(`\n${failures === 0 ? "All checks passed" : `${failures} checks failed`} (${results.length} checks).`);
 process.exitCode = failures === 0 ? 0 : 1;
