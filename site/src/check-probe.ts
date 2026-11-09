@@ -39,7 +39,8 @@ check("logs name the real Alloy exporter", await until(() => text("#route-summar
 
 click("#signal-traces");
 check("traces reach Tempo", await until(() => nodesOnRoute().includes("service:tempo")), nodesOnRoute().join());
-check("traces show the second route to Mimir", await until(() => text("#route-summary").includes("second route")), text("#route-summary"));
+check("traces go through the tail sampler", nodesOnRoute().includes("otelcol.processor.tail_sampling.default"), nodesOnRoute().join());
+check("the span metrics and the service graph leave the receiver for Mimir", await until(() => /Span metrics leaves [^.]*Mimir/.test(text("#route-summary")) && /Service graph leaves [^.]*Mimir/.test(text("#route-summary"))), text("#route-summary"));
 
 click("#signal-profiles");
 check("profiles have no route through Alloy", await until(() => text("#detail-title") === "No route through Alloy"), text("#detail-title"));
@@ -51,8 +52,11 @@ click("#signal-metrics");
 const batch = await until(() => node("otelcol.processor.batch.default"));
 click(batch!);
 check("the batch node shows its real block", await until(() => excerptLines().some((line) => line.includes('otelcol.processor.batch "default"'))), excerptLines().slice(0, 3).join(" | "));
-check("the lines have their real numbers", lineNumbers()[0] === 84, lineNumbers().slice(0, 3).join());
-check("the excerpt links to the file on GitHub", $("#detail-sources a")?.getAttribute("href")?.includes("config/alloy/config.alloy#L84-L"), $("#detail-sources a")?.getAttribute("href"));
+// The unit tests compare the numbers with the file. The probe checks that the page keeps them: they follow each other, and
+// the link names the same first line.
+const numbers = lineNumbers();
+check("the lines have their numbers in the file", numbers[0]! > 1 && numbers.every((n, i) => n === numbers[0]! + i), numbers.slice(0, 3).join());
+check("the excerpt links to the same lines on GitHub", $("#detail-sources a")?.getAttribute("href")?.includes(`config/alloy/config.alloy#L${numbers[0]}-L`), $("#detail-sources a")?.getAttribute("href"));
 
 // The dashboard explorer.
 check("the Lag Monitor has its panels on the grid", tiles().length === Number(text('[data-board] span').split(" ")[0]), `${tiles().length} tiles, tab ${text("[data-board] span")}`);
@@ -102,16 +106,18 @@ click("#fit");
 // The port editor.
 const compose = () => $$("#resolved-file .ln .tx").map((line) => line.textContent ?? "");
 type("#input-GRAFANA_PORT", "3300");
-check("3300 changes the line of the Grafana port", await until(() => diffLine(106)?.textContent?.includes('"3300:3000"')), diffLine(106)?.textContent);
-check("the old value is on the same line", diffLine(106)?.textContent?.includes('"3000:3000"'), diffLine(106)?.textContent);
+// The line of the port in the Compose file, from the diff. The unit tests compare it with the file.
+const portLine = await until(() => Number($("#diff [data-line]")?.dataset["line"] ?? 0));
+check("3300 changes the line of the Grafana port", await until(() => diffLine(portLine)?.textContent?.includes('"3300:3000"')), `${portLine}: ${diffLine(portLine)?.textContent}`);
+check("the old value is on the same line", diffLine(portLine)?.textContent?.includes('"3000:3000"'), diffLine(portLine)?.textContent);
 check("the .env line changes too", $('#diff [data-env="GRAFANA_PORT"]')?.textContent?.includes("GRAFANA_PORT=3300"), $('#diff [data-env="GRAFANA_PORT"]')?.textContent);
 check("the command carries the value", text("#up-command") === "GRAFANA_PORT=3300 docker compose up -d", text("#up-command"));
 check("the map uses the same value", await until(() => (node("grafana")?.textContent ?? "").includes("3300")), node("grafana")?.textContent);
-check("the resolved file marks one line", $$("#resolved-file .ln.is-changed").length === 1 && compose()[105]?.includes('"3300:3000"'), compose()[105]);
+check("the resolved file marks one line", $$("#resolved-file .ln.is-changed").length === 1 && compose()[portLine - 1]?.includes('"3300:3000"'), compose()[portLine - 1]);
 
 type("#input-GRAFANA_PORT", "");
 check("an empty value falls back to the default of Compose", await until(() => text("#note-GRAFANA_PORT").includes("default 3000")), text("#note-GRAFANA_PORT"));
-check("the line of the fallback is the line of .env", diffLine(106) === null, diffLine(106)?.textContent);
+check("the line of the fallback is the line of .env", diffLine(portLine) === null, diffLine(portLine)?.textContent);
 
 type("#input-GRAFANA_PORT", "99999");
 check("a port out of range shows a problem", await until(() => problems().some((problem) => problem.includes("99999"))), problems().join());
