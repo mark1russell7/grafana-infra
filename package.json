@@ -13,7 +13,7 @@
   "license": "MIT",
   "private": true,
   "devDependencies": {
-    "@mark1russell7/otel-ts": "^0.6.0",
+    "@mark1russell7/otel-ts": "^0.7.5",
     "@mark1russell7/rigor-generators": "^0.1.8",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.223.0",
