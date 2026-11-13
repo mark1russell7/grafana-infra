@@ -77,7 +77,7 @@ services:
   # Alloy — OpenTelemetry Collector (CORS-enabled for browsers)
   # =========================================================================
   alloy:
-    image: grafana/alloy:v1.20.1
+    image: grafana/alloy:v1.21.3
     container_name: ${ALLOY_CONTAINER_NAME:-alloy}
     ports:
       - "${OTLP_GRPC_PORT:-4317}:4317"
