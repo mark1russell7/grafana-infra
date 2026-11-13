@@ -34,7 +34,7 @@ services:
   # Loki — Logs
   # =========================================================================
   loki:
-    image: grafana/loki:3.6.0
+    image: grafana/loki:3.7.9
     container_name: ${LOKI_CONTAINER_NAME:-loki}
     user: "0"
     ports:
