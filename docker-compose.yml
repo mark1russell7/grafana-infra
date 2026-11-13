@@ -50,7 +50,7 @@ services:
   # Tempo — Traces
   # =========================================================================
   tempo:
-    image: grafana/tempo:2.7.2
+    image: grafana/tempo:2.10.10
     container_name: ${TEMPO_CONTAINER_NAME:-tempo}
     ports:
       - "${TEMPO_PORT:-3200}:3200"
