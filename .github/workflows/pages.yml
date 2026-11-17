@@ -5,16 +5,6 @@ name: pages
 on:
   push:
     branches: [main]
-  pull_request:
-    paths:
-      - site/**
-      - config/**
-      - docker-compose.yml
-      - .env
-      - docs/ROADMAP.md
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - .github/workflows/pages.yml
   schedule:
     - cron: "37 5 * * *"
   workflow_dispatch:
@@ -35,22 +25,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@eb7f3517aa8614e338a46acd37ab0c49395be5f9 # main
-    with:
-      build: pnpm --filter @grafana-infra/site run build
-      out: site/dist
-      env: '{"SITE_BASE": "/${{ github.event.repository.name }}"}'
-      deploy: ${{ github.event_name != 'pull_request' }}
-      # The site-pages action adds releases/, status/, data/releases.json and data/status.json to the built site.
-      site-pages: true
-      site-name: grafana-infra
-      roadmap: docs/ROADMAP.md
-      # The check opens each page in a browser at 360, 400 and 1280 pixels, in light and dark.
-      # The probe drives the signal map, the dashboard explorer and the port editor.
-      # The check reads the TypeScript source and removes its types.
-      site-check: true
-      site-check-pages: /,/releases/,/status/
-      site-check-probe: site/src/check-probe.ts
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
 
   # This job examines the deployed site: the home page and the pages of site-pages.
   # It starts no code of the repository and reads only the public site.

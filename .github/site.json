@@ -1,0 +1,14 @@
+{
+  "$comment": "The site config of this repository (CI.md of the template, \"The site config\"). The Pages workflow deploys this site from main, and a job of ci.yml checks it on each pull request.",
+  "build": "pnpm --filter @grafana-infra/site run build",
+  "out": "site/dist",
+  "env": {
+    "SITE_BASE": "/{repo}"
+  },
+  "site-pages": true,
+  "site-name": "grafana-infra",
+  "roadmap": "docs/ROADMAP.md",
+  "site-check": true,
+  "site-check-pages": "/,/releases/,/status/",
+  "site-check-probe": "site/src/check-probe.ts"
+}

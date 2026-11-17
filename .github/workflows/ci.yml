@@ -28,3 +28,24 @@ jobs:
       - run: pnpm --filter @grafana-infra/site run typecheck
       - run: pnpm --filter @grafana-infra/site run test
       - run: pnpm --filter @grafana-infra/site run build
+
+  # The site of .github/site.json: the build, the site check and the probe, with no deploy (CI.md of the
+  # template, "The site config"). The Pages workflow deploys the same site from main.
+  site-check:
+    uses: mark1russell7/template/.github/workflows/reusable-pages-check.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+    permissions:
+      contents: read
+
+  # The summary check of the ruleset of main: each job passed (CI.md of the template, "The check of the
+  # ruleset").
+  ci-ok:
+    name: CI OK
+    if: ${{ !cancelled() }}
+    needs: [site, site-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mark1russell7/template/.github/actions/gate-summary@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+        with:
+          needs: ${{ toJSON(needs) }}
