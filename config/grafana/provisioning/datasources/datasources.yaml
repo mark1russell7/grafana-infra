@@ -29,7 +29,7 @@ datasources:
           url: "$${__value.raw}"
           datasourceUid: tempo
           matcherType: regex
-        # A log record in the context of a span (each Node service of the fleet,
+        # A log record in the context of a span (each Node service
         # with otel-ts) has the trace ID. Loki keeps it as the structured
         # metadata trace_id, so a log line opens its trace.
         - name: Trace
