@@ -154,7 +154,7 @@ To find a trace without the dashboard, use this TraceQL query in Explore with th
 
 ### Node services: traces, logs and metrics with links
 
-A Node service of the fleet sends its telemetry with `startNodeTelemetry()` of `@mark1russell7/otel-ts/node`: OTLP/HTTP protobuf to Alloy on port 4318 (`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`). The stack keeps the three signals and links them:
+A Node service sends its telemetry with `startNodeTelemetry()` of `@mark1russell7/otel-ts/node`: OTLP/HTTP protobuf to Alloy on port 4318 (`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`). The stack keeps the three signals and links them:
 
 - **Log line to trace.** A log record in the context of a span has the trace ID and the span ID. Loki keeps them as the structured metadata `trace_id` and `span_id`. The Loki derived field `Trace` (a label matcher on `trace_id`) shows the link "Open the trace" in Explore. To find the lines of one trace, use `{service_name="<service>"} | trace_id="<trace ID>"`.
 - **Trace to log lines.** In Tempo, "Logs for this span" shows the lines of the trace (`trace_id`), from 1 minute before the span to 1 minute after it. A span with a `service.instance.id` (a lag page load) also shows the lag events of its page load.
@@ -375,7 +375,7 @@ The script also sends the spans, as `createOtelSpanSink` sends them: one trace f
 - Grafana reads the traces from Tempo. The Loki derived field and the Trace column link to Tempo.
 - With `--node-summary`, the sample Node service: Tempo has each trace, with the server span and its child span. Each log line in Loki has the `trace_id` and the `span_id` of its request, and LogQL finds the line of one trace. Mimir has the span metrics of the service from Alloy (with the failed request, no `instance` label, and no series of Tempo), exemplars with a trace ID of the sample, and the counter of the service. The Loki datasource links `trace_id` to Tempo, and "Logs for this span" of a span of the service gives only the line of its trace.
 
-`scripts/send-node-service-data.mjs` uses `startNodeTelemetry()` of otel-ts, as a Node service of the fleet does. Each request is a trace: a server span `GET /orders`, a child span `db.query`, and one log line in the context of the server span. The last request fails.
+`scripts/send-node-service-data.mjs` uses `startNodeTelemetry()` of otel-ts, as a Node service does. Each request is a trace: a server span `GET /orders`, a child span `db.query`, and one log line in the context of the server span. The last request fails.
 
 `scripts/screenshot-dashboard.mjs` takes screenshots after the sample data:
 

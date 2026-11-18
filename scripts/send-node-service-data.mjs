@@ -2,7 +2,7 @@
 /**
  * Sends the telemetry of a sample Node service to the stack, with
  * `startNodeTelemetry()` of `@mark1russell7/otel-ts/node` (roadmap item C9 of
- * otel-ts). It is the form of telemetry of each Node service of the fleet:
+ * otel-ts). It is the form of telemetry of each Node service:
  * OTLP/HTTP protobuf to Alloy on port 4318.
  *
  * The service runs some requests. Each request is a trace: a server span
