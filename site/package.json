@@ -13,8 +13,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/site-pages": "^0.7.0",
-    "@mark1russell7/text": "^0.0.13"
+    "@mark1russell7/site-pages": "^0.8.0",
+    "@mark1russell7/text": "^0.0.16"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
