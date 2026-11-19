@@ -55,10 +55,10 @@ importers:
     dependencies:
       '@mark1russell7/site-pages':
         specifier: ^0.8.0
-        version: 0.8.0
+        version: 0.8.1
       '@mark1russell7/text':
-        specifier: ^0.0.16
-        version: 0.0.16
+        specifier: ^0.0.17
+        version: 0.0.17
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -272,13 +272,13 @@ packages:
     resolution: {integrity: sha512-2YQKwuR9DHh5l98U8G9ADvVpjBfsZ/smMslBuPf4ryYUVSefS+xl06pulhoeH+Ya7s5uUsS7yEovg8h64E3jOw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.0':
-    resolution: {integrity: sha512-OlqsZfj5yNovI1ysfPJEIVsRnON3KgEP9ELMIH5CO+kP9FY5Vu873oCY+Zja5dKB8wTVgU3YewEcTqH9ncDurg==}
+  '@mark1russell7/site-pages@0.8.1':
+    resolution: {integrity: sha512-R8lPPyDNAbemR2YBrivAIYkXNfQgJDUhggKiUGWHNEZTKwUpLtVGvl/lqD/bkhoSh9IluAhnz5c/5R/A/uFeVA==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.16':
-    resolution: {integrity: sha512-hq2AWdtbKtXlibTTcVA/6GQAxgPj+6U3Hdmkh1I4sRMQZn/SiKh1k78UtcMgtcLJxwHHG9GVs2O2VNQxJP7R1Q==}
+  '@mark1russell7/text@0.0.17':
+    resolution: {integrity: sha512-jFqqVfCTQ0N65qvMP/gANAbnqB7ewpA3IeNxPeQTuF3IoSZkTgTl92PE47F5IOOfgz0Q0dF723crrYB8T6pR3g==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -1641,11 +1641,11 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.2.0
 
-  '@mark1russell7/site-pages@0.8.0':
+  '@mark1russell7/site-pages@0.8.1':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.10
 
-  '@mark1russell7/text@0.0.16': {}
+  '@mark1russell7/text@0.0.17': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
