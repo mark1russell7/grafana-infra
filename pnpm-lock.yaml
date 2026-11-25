@@ -10,10 +10,10 @@ importers:
     devDependencies:
       '@mark1russell7/otel-ts':
         specifier: ^0.8.2
-        version: 0.8.4(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
+        version: 0.8.5(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.1
+        version: 0.2.4
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -55,10 +55,10 @@ importers:
     dependencies:
       '@mark1russell7/site-pages':
         specifier: ^0.8.0
-        version: 0.8.3
+        version: 0.8.4
       '@mark1russell7/text':
-        specifier: ^0.0.17
-        version: 0.0.17
+        specifier: ^0.0.18
+        version: 0.0.18
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -252,8 +252,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/otel-ts@0.8.4':
-    resolution: {integrity: sha512-1TXQs/tPD/ptzh8xfaenAQiJMKu37/oWT6VsVrDBwIMwGUqbIMfy0DBrU4HdTzs4kmik7VdXGnP6Ypf7r+2TFw==}
+  '@mark1russell7/otel-ts@0.8.5':
+    resolution: {integrity: sha512-tlhtI5HhsYahFbb54Zqr2aCsVEdiOR05el7lfXRVqs6Q71KAZigwdIaNU5Dyzvzr5/Qz33UQSWdFkFQMp8bujQ==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@mark1russell7/lag': '>=0.4.2 <0.6.0'
@@ -264,21 +264,21 @@ packages:
       '@opentelemetry/sdk-node':
         optional: true
 
-  '@mark1russell7/rigor-generators@0.2.1':
-    resolution: {integrity: sha512-bWhgmh1I74o1KuNRycv43pZFseddTWTrvEAQjLWnMeiM3p9sB2ACvBiWradssLhCBhIrz2UxY9+5K34fZoUBnA==}
+  '@mark1russell7/rigor-generators@0.2.4':
+    resolution: {integrity: sha512-9eem6sh2XT0dEqhtDhJTeJWlY9vWsmiEG9hwTcQwdt+MF1jTALHjEzJqvkRP9DwdvGRAoMYBnXfo1kavTkqzMg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.10':
     resolution: {integrity: sha512-2YQKwuR9DHh5l98U8G9ADvVpjBfsZ/smMslBuPf4ryYUVSefS+xl06pulhoeH+Ya7s5uUsS7yEovg8h64E3jOw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.3':
-    resolution: {integrity: sha512-ZYjdSgnBbBZBLtZ6J7Qs5WZYFNMswKT/SdGi8wHX6v69WvmOxr0F9fn1HuDNFrSoxFbE2h/jibfjjgJ84iQ9Rg==}
+  '@mark1russell7/site-pages@0.8.4':
+    resolution: {integrity: sha512-pC0qcQqIsfQg5jTg+peUP/DGBXb4d1PQYiu6TCeCE1ALc5X8nyGhj9vMYKBCdhK7uHm8Chtx7INLKPWPmxpK3w==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.17':
-    resolution: {integrity: sha512-jFqqVfCTQ0N65qvMP/gANAbnqB7ewpA3IeNxPeQTuF3IoSZkTgTl92PE47F5IOOfgz0Q0dF723crrYB8T6pR3g==}
+  '@mark1russell7/text@0.0.18':
+    resolution: {integrity: sha512-sIOsTkBOhWLSDyE4qKyiokUT84NPJgPuhLPDyh2Y+mjGnNbGhF9Q6dt9NnSBtSW8C1D0rZfx8fPJ53g0gQGWfQ==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -1613,7 +1613,7 @@ snapshots:
 
   '@mark1russell7/cue@2.1.4': {}
 
-  '@mark1russell7/otel-ts@0.8.4(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
+  '@mark1russell7/otel-ts@0.8.5(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
     dependencies:
       '@grafana/faro-web-sdk': 2.13.0
       '@opentelemetry/api': 1.10.0
@@ -1642,17 +1642,17 @@ snapshots:
       - vite
       - zone.js
 
-  '@mark1russell7/rigor-generators@0.2.1': {}
+  '@mark1russell7/rigor-generators@0.2.4': {}
 
   '@mark1russell7/rigor-statistics@0.2.10':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.1
+      '@mark1russell7/rigor-generators': 0.2.4
 
-  '@mark1russell7/site-pages@0.8.3':
+  '@mark1russell7/site-pages@0.8.4':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.10
 
-  '@mark1russell7/text@0.0.17': {}
+  '@mark1russell7/text@0.0.18': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
