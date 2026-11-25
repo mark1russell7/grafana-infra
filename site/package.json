@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@mark1russell7/site-pages": "^0.8.0",
-    "@mark1russell7/text": "^0.0.17"
+    "@mark1russell7/text": "^0.0.18"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
