@@ -9,11 +9,11 @@ importers:
   .:
     devDependencies:
       '@mark1russell7/otel-ts':
-        specifier: ^0.8.2
-        version: 0.8.5(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
+        specifier: ^0.10.0
+        version: 0.10.0(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.4
+        version: 0.2.6
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -55,10 +55,10 @@ importers:
     dependencies:
       '@mark1russell7/site-pages':
         specifier: ^0.8.0
-        version: 0.8.4
+        version: 0.8.7
       '@mark1russell7/text':
-        specifier: ^0.0.18
-        version: 0.0.18
+        specifier: ^0.0.20
+        version: 0.0.20
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -252,8 +252,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/otel-ts@0.8.5':
-    resolution: {integrity: sha512-tlhtI5HhsYahFbb54Zqr2aCsVEdiOR05el7lfXRVqs6Q71KAZigwdIaNU5Dyzvzr5/Qz33UQSWdFkFQMp8bujQ==}
+  '@mark1russell7/otel-ts@0.10.0':
+    resolution: {integrity: sha512-oHY7jTw+Nj0Vqs2Llm2oDvziqNln0YHf0TK81PM1sChh+qZJtTiWClZgOT9XZq89hlTxi0YTiUtt1kj7b8xylA==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@mark1russell7/lag': '>=0.4.2 <0.6.0'
@@ -264,21 +264,21 @@ packages:
       '@opentelemetry/sdk-node':
         optional: true
 
-  '@mark1russell7/rigor-generators@0.2.4':
-    resolution: {integrity: sha512-9eem6sh2XT0dEqhtDhJTeJWlY9vWsmiEG9hwTcQwdt+MF1jTALHjEzJqvkRP9DwdvGRAoMYBnXfo1kavTkqzMg==}
+  '@mark1russell7/rigor-generators@0.2.6':
+    resolution: {integrity: sha512-twMYvM//nGt/oumhZ2uFiXpC+ve59B1Zl8hinUnAaru4Vy5MiybhKggrESyDhvc519dWIGTbwWd000hsLkhVsA==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.10':
     resolution: {integrity: sha512-2YQKwuR9DHh5l98U8G9ADvVpjBfsZ/smMslBuPf4ryYUVSefS+xl06pulhoeH+Ya7s5uUsS7yEovg8h64E3jOw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.4':
-    resolution: {integrity: sha512-pC0qcQqIsfQg5jTg+peUP/DGBXb4d1PQYiu6TCeCE1ALc5X8nyGhj9vMYKBCdhK7uHm8Chtx7INLKPWPmxpK3w==}
+  '@mark1russell7/site-pages@0.8.7':
+    resolution: {integrity: sha512-0U814F6nv69ueZ82B+PKkHH/Y8qapXNTFo2KMchvfqBcEkYh+2eQYAGdPzJANR+xni9HJZVpeC2nu+/lCeaEDQ==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.18':
-    resolution: {integrity: sha512-sIOsTkBOhWLSDyE4qKyiokUT84NPJgPuhLPDyh2Y+mjGnNbGhF9Q6dt9NnSBtSW8C1D0rZfx8fPJ53g0gQGWfQ==}
+  '@mark1russell7/text@0.0.20':
+    resolution: {integrity: sha512-HrjBak4BE0fDC+bLzFi/c4NDCHqiUm7VhYR5YhJmkApRSB8mUOao4bFiO9Jy3xwpsCGJCj4echVDCUxXjV+3NA==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -1613,9 +1613,10 @@ snapshots:
 
   '@mark1russell7/cue@2.1.4': {}
 
-  '@mark1russell7/otel-ts@0.8.5(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
+  '@mark1russell7/otel-ts@0.10.0(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
     dependencies:
       '@grafana/faro-web-sdk': 2.13.0
+      '@mark1russell7/text': 0.0.20
       '@opentelemetry/api': 1.10.0
       '@opentelemetry/auto-instrumentations-web': 0.70.1(@opentelemetry/api@1.10.0)(zone.js@0.16.3)
       '@opentelemetry/context-async-hooks': 3.1.1(@opentelemetry/api@1.10.0)
@@ -1642,17 +1643,17 @@ snapshots:
       - vite
       - zone.js
 
-  '@mark1russell7/rigor-generators@0.2.4': {}
+  '@mark1russell7/rigor-generators@0.2.6': {}
 
   '@mark1russell7/rigor-statistics@0.2.10':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.4
+      '@mark1russell7/rigor-generators': 0.2.6
 
-  '@mark1russell7/site-pages@0.8.4':
+  '@mark1russell7/site-pages@0.8.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.10
 
-  '@mark1russell7/text@0.0.18': {}
+  '@mark1russell7/text@0.0.20': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
