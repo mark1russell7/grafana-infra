@@ -73,7 +73,7 @@ jobs:
         if: matrix.arm == 'stack'
         shell: bash
         run: |
-          node scripts/build-dashboards.ts
+          node scripts/build-dashboards.mjs
           docker compose up -d
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:12345/-/ready && curl -fsS http://localhost:9009/ready \
