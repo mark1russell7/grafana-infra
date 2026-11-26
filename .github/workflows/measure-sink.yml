@@ -2,16 +2,15 @@ name: Measure sink
 
 # The memory and CPU of two places for the telemetry of the services, at the
 # same load: the stack of this repository (arm stack) and the light SQLite sink
-# of bench/sink/sqlite-sink.mjs (arm sqlite). Each job runs one arm at one rate,
-# in two phases: idle for 60 seconds, then the load of bench/sink/load.mjs. A
+# of bench/sink/sqlite-sink.ts (arm sqlite). Each job runs one arm at one rate,
+# in two phases: idle for 60 seconds, then the load of bench/sink/load.ts. A
 # sampler reads `docker stats` each 5 seconds, so the two arms are measured the
 # same way. Two rounds of each cell give the spread (A/A). The job summary has
-# the table of bench/sink/summarize.mjs.
+# the table of bench/sink/summarize.ts.
 on:
+  # Each pull request starts this workflow, so its summary check is always there. The job changes skips the
+  # measure when the pull request changes no file of the sink (CI.md of the template, "A gate with paths").
   pull_request:
-    paths:
-      - bench/sink/**
-      - .github/workflows/measure-sink.yml
   workflow_dispatch:
     inputs:
       seconds:
@@ -26,11 +25,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      match: ${{ steps.changes.outputs.match }}
+    steps:
+      - id: changes
+        uses: mark1russell7/template/.github/actions/changes@7c83f30551e066c06852ea75bf0140eadfc49961 # main
+        with:
+          paths: |
+            bench/sink/**
+            .github/workflows/measure-sink.yml
+
   measure:
+    needs: changes
+    if: needs.changes.outputs.match == 'true'
     name: ${{ matrix.arm }} at ${{ matrix.rate }} spans/s, round ${{ matrix.round }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
+      # three jobs at a time: the measure runs 12 jobs, and the other workflows of the repository need runners too
+      max-parallel: 3
       fail-fast: false
       matrix:
         arm: [stack, sqlite]
@@ -40,10 +59,12 @@ jobs:
       LOAD_SECONDS: ${{ inputs.seconds || '180' }}
       OUT: records/${{ matrix.arm }}-${{ matrix.rate }}-${{ matrix.round }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # The version comes from packageManager in package.json
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: pnpm
@@ -52,7 +73,7 @@ jobs:
         if: matrix.arm == 'stack'
         shell: bash
         run: |
-          node scripts/build-dashboards.mjs
+          node scripts/build-dashboards.ts
           docker compose up -d
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:12345/-/ready && curl -fsS http://localhost:9009/ready \
@@ -67,7 +88,7 @@ jobs:
         shell: bash
         run: |
           docker run -d --name sqlite-sink -p 4318:4318 -v "$PWD:/work" -w /work node:24-slim \
-            node bench/sink/sqlite-sink.mjs --db /data/otlp.db
+            node bench/sink/sqlite-sink.ts --db /data/otlp.db
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:4318/ready; then exit 0; fi
             sleep 1
@@ -91,7 +112,7 @@ jobs:
           sleep 60
           echo load > phase
           status=0
-          node bench/sink/load.mjs --rate ${{ matrix.rate }} --seconds "$LOAD_SECONDS" --summary "$OUT/load-summary.json" || status=$?
+          node bench/sink/load.ts --rate ${{ matrix.rate }} --seconds "$LOAD_SECONDS" --summary "$OUT/load-summary.json" || status=$?
           echo done > phase
           kill "$sampler"
           exit "$status"
@@ -119,7 +140,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.arm }}" = stack ]; then docker compose logs --tail 100; else docker logs sqlite-sink; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: sink-${{ matrix.arm }}-${{ matrix.rate }}-${{ matrix.round }}
@@ -128,25 +149,41 @@ jobs:
 
   summary:
     name: The table of the two arms
-    needs: measure
-    if: ${{ !cancelled() }}
+    needs: [changes, measure]
+    if: ${{ !cancelled() && needs.changes.outputs.match == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: sink-*
           path: records/
           merge-multiple: true
-      - run: node bench/sink/summarize.mjs records --markdown summary.md --json summary.json
+      - run: node bench/sink/summarize.ts records --markdown summary.md --json summary.json
       - run: cat summary.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sink-summary
           path: |
             summary.md
             summary.json
+
+  # The summary check of this workflow: each job passed, or the pull request changes no file of the sink
+  # (CI.md of the template, "A gate with paths").
+  measure-ok:
+    name: Measure sink OK
+    if: ${{ !cancelled() }}
+    needs: [changes, measure, summary]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mark1russell7/template/.github/actions/gate-summary@7c83f30551e066c06852ea75bf0140eadfc49961 # main
+        with:
+          needs: ${{ toJSON(needs) }}

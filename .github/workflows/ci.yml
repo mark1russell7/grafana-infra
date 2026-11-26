@@ -33,9 +33,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Each rule of @mark1russell7/conventions, with the settings in package.json. It reads the files, so it needs no build.
       - run: pnpm check:conventions
-      - run: pnpm --filter @grafana-infra/site run typecheck
+      # the types of the site and of the scripts of bench/
+      - run: pnpm typecheck
       - run: pnpm --filter @grafana-infra/site run test
       - run: pnpm --filter @grafana-infra/site run build
+      # a test of the sink and the load of the measure-sink workflow
+      - run: pnpm test:bench
 
   # The site of .github/site.json: the build, the site check and the probe, with no deploy (CI.md of the
   # template, "The site config"). The Pages workflow deploys the same site from main.

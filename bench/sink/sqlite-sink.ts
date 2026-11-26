@@ -18,12 +18,78 @@
  *   GET /stats          the count of the rows of each table, and the size of the file
  *
  * Usage:
- *   node bench/sink/sqlite-sink.mjs [--db otlp.db] [--port 4318]
+ *   node bench/sink/sqlite-sink.ts [--db otlp.db] [--port 4318]
  */
 import { statSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
 import { migrate, openDatabase, transaction } from "@mark1russell7/sqlite";
+import { createPrinter } from "@mark1russell7/text/print";
+
+const print = createPrinter({ out: process.stdout, err: process.stderr });
+
+/** The parts of OTLP/HTTP JSON that the sink reads */
+interface AnyValue {
+  readonly stringValue?: string;
+  readonly boolValue?: boolean;
+  readonly intValue?: string | number;
+  readonly doubleValue?: number;
+  readonly arrayValue?: { readonly values?: readonly AnyValue[] };
+}
+interface KeyValue {
+  readonly key: string;
+  readonly value?: AnyValue;
+}
+interface Resource {
+  readonly attributes?: readonly KeyValue[];
+}
+type Nanos = string | number | undefined;
+interface Span {
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly parentSpanId?: string;
+  readonly name: string;
+  readonly kind?: number;
+  readonly startTimeUnixNano?: Nanos;
+  readonly endTimeUnixNano?: Nanos;
+  readonly attributes?: readonly KeyValue[];
+  readonly status?: { readonly code?: number };
+}
+interface LogRecord {
+  readonly timeUnixNano?: Nanos;
+  readonly observedTimeUnixNano?: Nanos;
+  readonly severityNumber?: number;
+  readonly body?: AnyValue;
+  readonly traceId?: string;
+  readonly spanId?: string;
+  readonly attributes?: readonly KeyValue[];
+}
+interface NumberPoint {
+  readonly timeUnixNano?: Nanos;
+  readonly attributes?: readonly KeyValue[];
+  readonly asDouble?: number;
+  readonly asInt?: string | number;
+}
+interface HistogramPoint {
+  readonly timeUnixNano?: Nanos;
+  readonly attributes?: readonly KeyValue[];
+  readonly count?: string | number;
+  readonly sum?: number;
+  readonly explicitBounds?: readonly number[];
+  readonly bucketCounts?: readonly (string | number)[];
+}
+interface Metric {
+  readonly name: string;
+  readonly sum?: { readonly dataPoints?: readonly NumberPoint[] };
+  readonly gauge?: { readonly dataPoints?: readonly NumberPoint[] };
+  readonly histogram?: { readonly dataPoints?: readonly HistogramPoint[] };
+}
+interface Export {
+  readonly resourceSpans?: readonly { readonly resource?: Resource; readonly scopeSpans?: readonly { readonly spans?: readonly Span[] }[] }[];
+  readonly resourceLogs?: readonly { readonly resource?: Resource; readonly scopeLogs?: readonly { readonly logRecords?: readonly LogRecord[] }[] }[];
+  readonly resourceMetrics?: readonly { readonly resource?: Resource; readonly scopeMetrics?: readonly { readonly metrics?: readonly Metric[] }[] }[];
+}
+type Value = string | number | boolean | null | readonly Value[];
 
 const { values } = parseArgs({ options: { db: { type: "string", default: "otlp.db" }, port: { type: "string", default: "4318" } } });
 
@@ -47,17 +113,17 @@ const insertLog = db.prepare("INSERT INTO logs VALUES (?, ?, ?, ?, ?, ?, ?)");
 const insertPoint = db.prepare("INSERT INTO points VALUES (?, ?, ?, ?, ?, ?)");
 
 /** The value of an OTLP JSON AnyValue */
-const valueOf = (value) =>
+const valueOf = (value: AnyValue | undefined): Value =>
   value === undefined || value === null
     ? null
-    : (value.stringValue ?? value.boolValue ?? (value.intValue === undefined ? undefined : Number(value.intValue)) ?? value.doubleValue ?? (value.arrayValue ? value.arrayValue.values?.map(valueOf) : undefined) ?? null);
-const attributesOf = (list = []) => Object.fromEntries(list.map(({ key, value }) => [key, valueOf(value)]));
-const serviceOf = (resource) => String(attributesOf(resource?.attributes)["service.name"] ?? "unknown_service");
+    : (value.stringValue ?? value.boolValue ?? (value.intValue === undefined ? undefined : Number(value.intValue)) ?? value.doubleValue ?? (value.arrayValue ? (value.arrayValue.values ?? []).map(valueOf) : undefined) ?? null);
+const attributesOf = (list: readonly KeyValue[] = []): Record<string, Value> => Object.fromEntries(list.map(({ key, value }) => [key, valueOf(value)]));
+const serviceOf = (resource: Resource | undefined): string => String(attributesOf(resource?.attributes)["service.name"] ?? "unknown_service");
 // the times stay BigInt from the parse to SQLite: a nanosecond time of today is past 2^53
-const ns = (text) => (text === undefined ? 0n : BigInt(text));
+const ns = (text: Nanos): bigint => (text === undefined ? 0n : BigInt(text));
 
-const writers = {
-  "/v1/traces": (body) => {
+const writers: Record<string, (body: Export) => number> = {
+  "/v1/traces": (body: Export): number => {
     let rows = 0;
     for (const { resource, scopeSpans = [] } of body.resourceSpans ?? [])
       for (const { spans = [] } of scopeSpans)
@@ -67,7 +133,7 @@ const writers = {
         }
     return rows;
   },
-  "/v1/logs": (body) => {
+  "/v1/logs": (body: Export): number => {
     let rows = 0;
     for (const { resource, scopeLogs = [] } of body.resourceLogs ?? [])
       for (const { logRecords = [] } of scopeLogs)
@@ -78,7 +144,7 @@ const writers = {
         }
     return rows;
   },
-  "/v1/metrics": (body) => {
+  "/v1/metrics": (body: Export): number => {
     let rows = 0;
     for (const { resource, scopeMetrics = [] } of body.resourceMetrics ?? [])
       for (const { metrics = [] } of scopeMetrics)
@@ -113,12 +179,9 @@ const errors = db.prepare(
   `SELECT service, COUNT(*) AS spans, SUM(status = 2) AS failed, ROUND(1.0 * SUM(status = 2) / COUNT(*), 4) AS rate FROM spans
    WHERE kind = 2 AND start_ns >= ? GROUP BY service ORDER BY service`,
 );
-const counts = () => ({
-  spans: db.prepare("SELECT COUNT(*) AS n FROM spans").get().n,
-  logs: db.prepare("SELECT COUNT(*) AS n FROM logs").get().n,
-  points: db.prepare("SELECT COUNT(*) AS n FROM points").get().n,
-});
-const fileBytes = () => ["", "-wal"].reduce((total, suffix) => {
+const count = (table: string): number => Number(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()?.["n"] ?? 0);
+const counts = () => ({ spans: count("spans"), logs: count("logs"), points: count("points") });
+const fileBytes = (): number => ["", "-wal"].reduce((total, suffix) => {
   try {
     return total + statSync(values.db + suffix).size;
   } catch {
@@ -126,11 +189,11 @@ const fileBytes = () => ["", "-wal"].reduce((total, suffix) => {
   }
 }, 0);
 
-const reply = (response, status, body) => {
+const reply = (response: ServerResponse, status: number, body: unknown): void => {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(JSON.stringify(body));
 };
-const timed = (rows) => {
+const timed = <T>(rows: () => T): { ms: number; rows: T } => {
   const started = performance.now();
   const result = rows();
   return { ms: Math.round((performance.now() - started) * 1000) / 1000, rows: result };
@@ -151,20 +214,20 @@ const server = createServer((request, response) => {
   const write = writers[path];
   if (request.method !== "POST" || write === undefined) return reply(response, 404, { error: `no route ${request.method} ${path}` });
   if (!String(request.headers["content-type"] ?? "").includes("json")) return reply(response, 415, { error: "the sink takes OTLP/HTTP JSON only" });
-  const chunks = [];
-  request.on("data", (chunk) => chunks.push(chunk));
+  const chunks: Buffer[] = [];
+  request.on("data", (chunk: Buffer) => chunks.push(chunk));
   request.on("end", () => {
     try {
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Export;
       transaction(db, () => write(body));
       reply(response, 200, {});
     } catch (error) {
-      reply(response, 400, { error: String(error?.message ?? error) });
+      reply(response, 400, { error: error instanceof Error ? error.message : String(error) });
     }
   });
 });
 
-server.listen(Number(values.port), () => console.log(`the SQLite sink takes OTLP/HTTP JSON on port ${values.port}, file ${values.db}`));
+server.listen(Number(values.port), () => print.line(`the SQLite sink takes OTLP/HTTP JSON on port ${values.port}, file ${values.db}`));
 const stop = () => server.close(() => {
   db.close();
   process.exit(0);
