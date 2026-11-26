@@ -9,14 +9,14 @@ importers:
   .:
     devDependencies:
       '@mark1russell7/conventions':
-        specifier: ^0.53.2
-        version: 0.53.2
+        specifier: ^0.54.0
+        version: 0.54.0
       '@mark1russell7/otel-ts':
         specifier: ^0.10.0
-        version: 0.10.0(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
+        version: 0.10.1(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.6
+        version: 0.2.7
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -250,8 +250,8 @@ packages:
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
 
-  '@mark1russell7/conventions@0.53.2':
-    resolution: {integrity: sha512-OfFvxHZl4Eu6zRcgzSmnEoXF5eZGgv1rpw4qdGUmfpS1jR1wFgEpiZPGW2W3R/lHBZ/4VN24/rV7/6SIboTWmQ==}
+  '@mark1russell7/conventions@0.54.0':
+    resolution: {integrity: sha512-pqdCwKE5ejF5Bf0pYvpbykFpzW8zgBh3MCRmpiOzuXgIYCnoEPAHmPFB316BohXS9HMV6o5OJsjfXJPq+gR+Vw==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -260,8 +260,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/otel-ts@0.10.0':
-    resolution: {integrity: sha512-oHY7jTw+Nj0Vqs2Llm2oDvziqNln0YHf0TK81PM1sChh+qZJtTiWClZgOT9XZq89hlTxi0YTiUtt1kj7b8xylA==}
+  '@mark1russell7/otel-ts@0.10.1':
+    resolution: {integrity: sha512-drQiplg8jObERrc9FwH2XY+gxipbWu/KvEjdRgnU7ALvQRzTRBDTtAFRTNJ4oedwgoY/WZnXW8VwOzimOFvzQw==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@mark1russell7/lag': '>=0.4.2 <0.6.0'
@@ -272,8 +272,8 @@ packages:
       '@opentelemetry/sdk-node':
         optional: true
 
-  '@mark1russell7/rigor-generators@0.2.6':
-    resolution: {integrity: sha512-twMYvM//nGt/oumhZ2uFiXpC+ve59B1Zl8hinUnAaru4Vy5MiybhKggrESyDhvc519dWIGTbwWd000hsLkhVsA==}
+  '@mark1russell7/rigor-generators@0.2.7':
+    resolution: {integrity: sha512-7UwfykXyUqZBHZPNf/tHI2ExwsCTZLPmTqdl1FdmilkmWptdNy30PU8QEeF0u/LQ0W4OUv78r2rAS+PtQJOBug==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.10':
@@ -284,10 +284,6 @@ packages:
     resolution: {integrity: sha512-0U814F6nv69ueZ82B+PKkHH/Y8qapXNTFo2KMchvfqBcEkYh+2eQYAGdPzJANR+xni9HJZVpeC2nu+/lCeaEDQ==}
     engines: {node: '>=22'}
     hasBin: true
-
-  '@mark1russell7/text@0.0.19':
-    resolution: {integrity: sha512-pPJV318wzfEcsnnzlqVu+OBp/o9VLKWsAo1Wkf4rNaerOjgINDo+vErhmtPVQw6BzcVmGn4brXmMLcosCT9sAw==}
-    engines: {node: '>=22.12'}
 
   '@mark1russell7/text@0.0.20':
     resolution: {integrity: sha512-HrjBak4BE0fDC+bLzFi/c4NDCHqiUm7VhYR5YhJmkApRSB8mUOao4bFiO9Jy3xwpsCGJCj4echVDCUxXjV+3NA==}
@@ -1633,14 +1629,14 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@mark1russell7/conventions@0.53.2':
+  '@mark1russell7/conventions@0.54.0':
     dependencies:
-      '@mark1russell7/text': 0.0.19
+      '@mark1russell7/text': 0.0.20
       yaml: 2.9.1
 
   '@mark1russell7/cue@2.1.4': {}
 
-  '@mark1russell7/otel-ts@0.10.0(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
+  '@mark1russell7/otel-ts@0.10.1(@opentelemetry/sdk-node@0.223.0(@opentelemetry/api@1.9.1))(vite@8.3.7(@types/node@26.6.6)(yaml@2.9.1))(zone.js@0.16.3)':
     dependencies:
       '@grafana/faro-web-sdk': 2.13.0
       '@mark1russell7/text': 0.0.20
@@ -1670,17 +1666,15 @@ snapshots:
       - vite
       - zone.js
 
-  '@mark1russell7/rigor-generators@0.2.6': {}
+  '@mark1russell7/rigor-generators@0.2.7': {}
 
   '@mark1russell7/rigor-statistics@0.2.10':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.6
+      '@mark1russell7/rigor-generators': 0.2.7
 
   '@mark1russell7/site-pages@0.8.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.10
-
-  '@mark1russell7/text@0.0.19': {}
 
   '@mark1russell7/text@0.0.20': {}
 
@@ -1697,7 +1691,7 @@ snapshots:
 
   '@opentelemetry/api-logs@0.223.1':
     dependencies:
-      '@opentelemetry/api': 1.9.1
+      '@opentelemetry/api': 1.10.0
 
   '@opentelemetry/api@1.10.0': {}
 
