@@ -6,13 +6,16 @@
     "sample-data": "node scripts/send-sample-data.mjs",
     "node-sample-data": "node scripts/send-node-service-data.mjs",
     "dashboards": "node scripts/build-dashboards.mjs",
-    "verify": "node scripts/verify-pipeline.mjs"
+    "verify": "node scripts/verify-pipeline.mjs",
+    "check:conventions": "conventions check",
+    "typecheck": "pnpm --filter @grafana-infra/site run typecheck"
   },
-  "packageManager": "pnpm@10.26.0",
+  "packageManager": "pnpm@10.33.0",
   "type": "module",
   "license": "MIT",
   "private": true,
   "devDependencies": {
+    "@mark1russell7/conventions": "^0.53.2",
     "@mark1russell7/otel-ts": "^0.10.0",
     "@mark1russell7/rigor-generators": "^0.2.0",
     "@opentelemetry/api": "^1.9.1",
@@ -27,5 +30,34 @@
     "@opentelemetry/sdk-trace-base": "^2.12.0",
     "@vitest/coverage-v8": "^5.0.3",
     "playwright": "1.65.1"
+  },
+  "conventions": {
+    "rules": {
+      "no-console": {
+        "baseline": 0,
+        "failFrom": "2027-01-20",
+        "reason": "The sources of grafana-infra had 0 console calls on 2026-11-25, and the count stays at 0. Each console call fails from 2027-01-20. Output for a person goes to the printer of @mark1russell7/text, and a diagnostic goes to a log record of @mark1russell7/otel-ts."
+      },
+      "typed-scripts": {
+        "ignore": [
+          "scripts/build-dashboards.mjs",
+          "scripts/lib/lag-catalog.mjs",
+          "scripts/screenshot-dashboard.mjs",
+          "scripts/send-node-service-data.mjs",
+          "scripts/send-sample-data.mjs",
+          "scripts/verify-pipeline.mjs"
+        ],
+        "reason": "The 6 scripts of 2026-11-25 are JavaScript. The list only gets shorter, and a new JavaScript file fails. The end: a pull request that writes each script in TypeScript, with a tsconfig that the typecheck script examines."
+      },
+      "shared-ci": {
+        "off": "ci.yml runs its own job site (types, tests and build of the site package) on 2026-11-25. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the differences as its inputs."
+      },
+      "playwright-install": {
+        "ignore": [
+          ".github/workflows/verify.yml"
+        ],
+        "reason": "verify.yml installs Chromium with its own command on 2026-11-25. The end: verify.yml uses the action setup-playwright of the template, in the same pull request as the shared CI."
+      }
+    }
   }
 }

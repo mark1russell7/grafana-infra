@@ -6,8 +6,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A person starts a run on a branch with no pull request: gh workflow run ci.yml --ref <branch>
+  workflow_dispatch:
 
 permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   site:
@@ -25,6 +31,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Each rule of @mark1russell7/conventions, with the settings in package.json. It reads the files, so it needs no build.
+      - run: pnpm check:conventions
       - run: pnpm --filter @grafana-infra/site run typecheck
       - run: pnpm --filter @grafana-infra/site run test
       - run: pnpm --filter @grafana-infra/site run build
