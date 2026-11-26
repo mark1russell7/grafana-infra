@@ -1,0 +1,152 @@
+name: Measure sink
+
+# The memory and CPU of two places for the telemetry of the services, at the
+# same load: the stack of this repository (arm stack) and the light SQLite sink
+# of bench/sink/sqlite-sink.mjs (arm sqlite). Each job runs one arm at one rate,
+# in two phases: idle for 60 seconds, then the load of bench/sink/load.mjs. A
+# sampler reads `docker stats` each 5 seconds, so the two arms are measured the
+# same way. Two rounds of each cell give the spread (A/A). The job summary has
+# the table of bench/sink/summarize.mjs.
+on:
+  pull_request:
+    paths:
+      - bench/sink/**
+      - .github/workflows/measure-sink.yml
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: The seconds of the load in each job
+        default: "180"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  measure:
+    name: ${{ matrix.arm }} at ${{ matrix.rate }} spans/s, round ${{ matrix.round }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [stack, sqlite]
+        rate: [10, 100, 1000]
+        round: [1, 2]
+    env:
+      LOAD_SECONDS: ${{ inputs.seconds || '180' }}
+      OUT: records/${{ matrix.arm }}-${{ matrix.rate }}-${{ matrix.round }}
+    steps:
+      - uses: actions/checkout@v4
+      # The version comes from packageManager in package.json
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start the stack
+        if: matrix.arm == 'stack'
+        shell: bash
+        run: |
+          node scripts/build-dashboards.mjs
+          docker compose up -d
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:12345/-/ready && curl -fsS http://localhost:9009/ready \
+              && curl -fsS http://localhost:3100/ready && curl -fsS http://localhost:3200/ready \
+              && curl -fsS http://localhost:3000/api/health; then exit 0; fi
+            sleep 5
+          done
+          echo "The stack did not become ready in 5 minutes" >&2
+          exit 1
+      - name: Start the SQLite sink
+        if: matrix.arm == 'sqlite'
+        shell: bash
+        run: |
+          docker run -d --name sqlite-sink -p 4318:4318 -v "$PWD:/work" -w /work node:24-slim \
+            node bench/sink/sqlite-sink.mjs --db /data/otlp.db
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:4318/ready; then exit 0; fi
+            sleep 1
+          done
+          docker logs sqlite-sink
+          exit 1
+      - name: Measure the idle phase, then the load
+        shell: bash
+        run: |
+          mkdir -p "$OUT"
+          echo '{"arm":"${{ matrix.arm }}","rate":${{ matrix.rate }},"round":${{ matrix.round }}}' > "$OUT/meta.json"
+          echo idle > phase
+          (
+            while true; do
+              p=$(cat phase); t=$(date +%s)
+              docker stats --no-stream --format "{\"t\":$t,\"phase\":\"$p\",\"name\":\"{{.Name}}\",\"mem\":\"{{.MemUsage}}\",\"cpu\":\"{{.CPUPerc}}\"}" >> "$OUT/stats.jsonl"
+              sleep 5
+            done
+          ) &
+          sampler=$!
+          sleep 60
+          echo load > phase
+          status=0
+          node bench/sink/load.mjs --rate ${{ matrix.rate }} --seconds "$LOAD_SECONDS" --summary "$OUT/load-summary.json" || status=$?
+          echo done > phase
+          kill "$sampler"
+          exit "$status"
+      - name: Ask the sink one question
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          # The same question for each arm: the server spans of load-0 over 50 ms in the last hour
+          if [ "${{ matrix.arm }}" = stack ]; then
+            sleep 15
+            end=$(date +%s)
+            s=$(curl -fsS -o "$OUT/query-body.json" -w '%{time_total}' -G http://localhost:3200/api/search \
+              --data-urlencode 'q={ resource.service.name = "load-0" && kind = server && duration > 50ms }' \
+              --data-urlencode limit=20 --data-urlencode start=$((end - 3600)) --data-urlencode end=$end)
+            found=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).traces?.length ?? 0)' "$OUT/query-body.json")
+          else
+            s=$(curl -fsS -o "$OUT/query-body.json" -w '%{time_total}' "http://localhost:4318/query/slow?service=load-0&ms=50")
+            found=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).rows.length)' "$OUT/query-body.json")
+            curl -fsS http://localhost:4318/stats > "$OUT/rows.json"
+          fi
+          echo "{\"query\":\"the server spans of load-0 over 50 ms in the last hour\",\"seconds\":$s,\"found\":$found}" > "$OUT/query.json"
+          cat "$OUT/query.json"
+      - name: Logs of the sink
+        if: failure()
+        shell: bash
+        run: |
+          if [ "${{ matrix.arm }}" = stack ]; then docker compose logs --tail 100; else docker logs sqlite-sink; fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: sink-${{ matrix.arm }}-${{ matrix.rate }}-${{ matrix.round }}
+          path: records/
+          if-no-files-found: error
+
+  summary:
+    name: The table of the two arms
+    needs: measure
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sink-*
+          path: records/
+          merge-multiple: true
+      - run: node bench/sink/summarize.mjs records --markdown summary.md --json summary.json
+      - run: cat summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sink-summary
+          path: |
+            summary.md
+            summary.json
