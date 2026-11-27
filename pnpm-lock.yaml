@@ -17,6 +17,12 @@ importers:
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
         version: 0.2.7
+      '@mark1russell7/sqlite':
+        specifier: ^0.7.0
+        version: 0.7.0
+      '@mark1russell7/text':
+        specifier: ^0.0.20
+        version: 0.0.20
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -47,12 +53,18 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.1)
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.6
       '@vitest/coverage-v8':
         specifier: ^5.0.3
         version: 5.1.0(vitest@5.1.0)
       playwright:
         specifier: 1.65.1
         version: 1.65.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   site:
     dependencies:
@@ -284,6 +296,10 @@ packages:
     resolution: {integrity: sha512-0U814F6nv69ueZ82B+PKkHH/Y8qapXNTFo2KMchvfqBcEkYh+2eQYAGdPzJANR+xni9HJZVpeC2nu+/lCeaEDQ==}
     engines: {node: '>=22'}
     hasBin: true
+
+  '@mark1russell7/sqlite@0.7.0':
+    resolution: {integrity: sha512-9uYBKNfHpDWrPX0C88vcP3CDS3FmEH9ntfLRvIGayTLMYV99LHGw254iO3gRQxd83jq1ml7ER+l0tKW/CGKKTA==}
+    engines: {node: '>=22.13'}
 
   '@mark1russell7/text@0.0.20':
     resolution: {integrity: sha512-HrjBak4BE0fDC+bLzFi/c4NDCHqiUm7VhYR5YhJmkApRSB8mUOao4bFiO9Jy3xwpsCGJCj4echVDCUxXjV+3NA==}
@@ -1675,6 +1691,8 @@ snapshots:
   '@mark1russell7/site-pages@0.8.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.10
+
+  '@mark1russell7/sqlite@0.7.0': {}
 
   '@mark1russell7/text@0.0.20': {}
 
